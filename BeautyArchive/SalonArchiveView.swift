@@ -189,6 +189,7 @@ struct SalonVisitForm: View {
     @State private var bookingURL: String
     @State private var priceText: String
     @State private var drafts: [TreatmentDraft]
+    @State private var showingDetails: Bool
     @State private var errorMessage: String?
 
     init(visit: SalonVisit? = nil, treatments: [SalonTreatment] = [], copying: SalonVisit? = nil) {
@@ -205,6 +206,7 @@ struct SalonVisitForm: View {
         _drafts = State(initialValue: treatments.isEmpty
             ? [TreatmentDraft()]
             : treatments.map { TreatmentDraft(id: $0.id, name: $0.name, cycleDays: $0.cycleDays) })
+        _showingDetails = State(initialValue: visit != nil || copying != nil)
     }
 
     var body: some View {
@@ -257,30 +259,34 @@ struct SalonVisitForm: View {
                 } footer: {
                     Text("同じ施術名の最新の来店日から、次回の目安を計算します。")
                 }
-                Section("サロン（任意）") {
-                    TextField("店名", text: $salonName)
-                    TextField("担当者", text: $stylistName)
-                    TextField("金額", text: $priceText)
-                        .keyboardType(.numberPad)
-                    if !priceText.isEmpty && Int(priceText).map({ $0 >= 0 }) != true {
-                        Text("金額は0以上の数字で入力してください。")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                    TextField("予約URL", text: $bookingURL)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    if !bookingURL.isEmpty && validBookingURL == nil {
-                        Text("https:// または http:// から始まるURLを入力してください。")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
-                Section("メモ（任意）") {
+                Section("オーダー（任意）") {
                     TextField("オーダー", text: $orderNote, axis: .vertical)
-                    TextField("感想", text: $impression, axis: .vertical)
-                    TextField("次回のメモ", text: $nextVisitNote, axis: .vertical)
+                }
+                Section {
+                    DisclosureGroup(isExpanded: $showingDetails) {
+                        TextField("店名", text: $salonName)
+                        TextField("担当者", text: $stylistName)
+                        TextField("金額", text: $priceText)
+                            .keyboardType(.numberPad)
+                        if !priceText.isEmpty && Int(priceText).map({ $0 >= 0 }) != true {
+                            Text("金額は0以上の数字で入力してください。")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                        TextField("予約URL", text: $bookingURL)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        if !bookingURL.isEmpty && validBookingURL == nil {
+                            Text("https:// または http:// から始まるURLを入力してください。")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                        TextField("感想", text: $impression, axis: .vertical)
+                        TextField("次回のメモ", text: $nextVisitNote, axis: .vertical)
+                    } label: {
+                        Label("サロン情報・感想などの詳細", systemImage: "slider.horizontal.3")
+                    }
                 }
             }
             .navigationTitle(visit == nil ? "美容院の記録を追加" : "美容院の記録を編集")
