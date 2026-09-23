@@ -40,6 +40,10 @@ struct ProductUnitDetail: View {
                     LabeledContent("日付", value: estimate.date.formatted(date: .abbreviated, time: .omitted))
                     LabeledContent("使用日数", value: "\(estimate.usageDays)日")
                     LabeledContent("根拠", value: estimate.source.title)
+                    LabeledContent(
+                        "通知希望",
+                        value: unit.wantsReplacementNotification ? "オン（端末設定に従う）" : "オフ"
+                    )
                 }
             }
             if !unit.note.isEmpty {
@@ -74,6 +78,7 @@ struct ProductUnitForm: View {
     @State private var usesReplacementEstimate: Bool
     @State private var manualDaysText: String
     @State private var adjustedDaysText: String
+    @State private var wantsReplacementNotification: Bool
     @State private var errorMessage: String?
 
     init(product: BeautyProduct, unit: ProductUnit? = nil) {
@@ -91,6 +96,7 @@ struct ProductUnitForm: View {
         _usesReplacementEstimate = State(initialValue: unit?.usesReplacementEstimate ?? false)
         _manualDaysText = State(initialValue: unit?.manualUsageDays.map(String.init) ?? "")
         _adjustedDaysText = State(initialValue: unit?.adjustedUsageDays.map(String.init) ?? "")
+        _wantsReplacementNotification = State(initialValue: unit?.wantsReplacementNotification ?? false)
     }
 
     private var trimmedPrice: String {
@@ -187,6 +193,12 @@ struct ProductUnitForm: View {
                         Text("使用中で開封日がある1本に表示します。過去の有効な使い切り履歴があれば、その中央値を優先します。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        if status == .unopened || status == .inUse {
+                            Toggle("この1本の通知を受け取る", isOn: $wantsReplacementNotification)
+                            Text("端末全体の通知は設定タブで変更できます。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Section("メモ（任意）") {
@@ -229,6 +241,9 @@ struct ProductUnitForm: View {
         target.usesReplacementEstimate = usesReplacementEstimate
         target.manualUsageDays = usesReplacementEstimate ? manualUsageDays : nil
         target.adjustedUsageDays = usesReplacementEstimate ? adjustedUsageDays : nil
+        target.wantsReplacementNotification = usesReplacementEstimate
+            && (status == .unopened || status == .inUse)
+            && wantsReplacementNotification
         target.updatedAt = .now
         if unit == nil { modelContext.insert(target) }
         do {

@@ -45,6 +45,9 @@ struct SettingsView: View {
                     if leadChoice == -1 {
                         Stepper("\(customLeadDays)日前", value: $customLeadDays, in: 0...365)
                     }
+                    Text("通知は選んだ日の午前9時に届きます。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Text(authorizationDescription)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
