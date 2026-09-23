@@ -116,6 +116,9 @@ enum SalonMaintenance {
         var reservedNames: Set<String> = []
         let appointmentActions: [HomeAction] = appointments.compactMap { appointment in
             guard !appointment.isCancelled else { return nil }
+            guard appointment.completedVisitID == nil
+                || !visits.contains(where: { $0.id == appointment.completedVisitID })
+            else { return nil }
             let names = (namesByAppointment[appointment.id] ?? []).map(\.name)
                 .filter { !normalizedName($0).isEmpty }
             guard !names.isEmpty else { return nil }

@@ -35,7 +35,12 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab(value: AppTab.home) {
-                HomeView(actions: actions, selectedTab: $selectedTab)
+                HomeView(
+                    actions: actions,
+                    appointments: appointments,
+                    appointmentTreatments: appointmentTreatments,
+                    selectedTab: $selectedTab
+                )
             } label: {
                 Image(systemName: "house.fill")
                     .accessibilityLabel("ホーム")
@@ -91,10 +96,13 @@ private struct DestinationPlaceholder: View {
 
 private struct HomeView: View {
     let actions: [HomeAction]
+    let appointments: [BeautyAppointment]
+    let appointmentTreatments: [AppointmentTreatment]
     @Binding var selectedTab: AppTab
     @Environment(\.openURL) private var openURL
     @State private var showingAllActions = false
     @State private var showingAddVisit = false
+    @State private var completingAppointment: BeautyAppointment?
     @State private var showingLinkNotice = false
 
     private var upcoming: [HomeAction] { HomeAction.upcoming(from: actions) }
@@ -118,7 +126,12 @@ private struct HomeView: View {
                 allActionsSheet
             }
             .sheet(isPresented: $showingAddVisit) {
-                SalonVisitForm()
+                SalonVisitForm(
+                    completingAppointment: completingAppointment,
+                    appointmentTreatments: appointmentTreatments.filter {
+                        $0.appointmentID == completingAppointment?.id
+                    }
+                )
             }
             .alert("予約先が未登録です", isPresented: $showingLinkNotice) {
                 Button("閉じる", role: .cancel) { }
@@ -148,6 +161,7 @@ private struct HomeView: View {
             Spacer(minLength: 12)
 
             Button {
+                completingAppointment = nil
                 showingAddVisit = true
             } label: {
                 Image(systemName: "plus")
@@ -407,6 +421,7 @@ private struct HomeView: View {
         case .salonBooked:
             selectedTab = .archive
         case .salonNeedsRecord:
+            completingAppointment = appointments.first { $0.id == action.id }
             showingAddVisit = true
         case .itemReplacement:
             selectedTab = .items

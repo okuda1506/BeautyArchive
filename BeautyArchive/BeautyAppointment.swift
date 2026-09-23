@@ -10,6 +10,7 @@ final class BeautyAppointment {
     var shopName: String = ""
     var note: String = ""
     var statusRaw: String = "booked"
+    var completedVisitID: UUID? = nil
     var createdAt: Date = Date.now
     var updatedAt: Date = Date.now
 
@@ -21,6 +22,7 @@ final class BeautyAppointment {
         shopName: String = "",
         note: String = "",
         statusRaw: String = "booked",
+        completedVisitID: UUID? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -31,11 +33,13 @@ final class BeautyAppointment {
         self.shopName = shopName
         self.note = note
         self.statusRaw = statusRaw
+        self.completedVisitID = completedVisitID
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
 
     var isCancelled: Bool { statusRaw == "cancelled" }
+    var isCompleted: Bool { completedVisitID != nil }
 }
 
 @Model
