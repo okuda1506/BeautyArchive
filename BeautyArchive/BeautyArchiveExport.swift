@@ -60,7 +60,7 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.dateFormat = "yyyy-MM-dd-HHmm"
-            let name = "BeautyArchive-\(formatter.string(from: exportedAt))-\(UUID().uuidString.prefix(6)).json"
+            let name = "B-ONE-\(formatter.string(from: exportedAt))-\(UUID().uuidString.prefix(6)).json"
             let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
             try data.write(to: url, options: [.atomic, .completeFileProtection])
             return url
