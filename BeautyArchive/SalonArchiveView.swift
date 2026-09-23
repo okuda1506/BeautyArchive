@@ -65,6 +65,14 @@ struct SalonArchiveView: View {
             }
             .navigationTitle("記録")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink {
+                        HairReferenceListView()
+                    } label: {
+                        Label("参考スタイル", systemImage: "photo.stack")
+                    }
+                    .accessibilityLabel("髪型の参考スタイルを開く")
+                }
                 ToolbarItem(placement: .primaryAction) {
                     if let latestVisit = visits.first {
                         Menu {
@@ -154,7 +162,7 @@ private struct SalonVisitDetail: View {
             }
             if !photos.isEmpty {
                 Section("写真") {
-                    SalonPhotoGallery(photos: photos)
+                    PhotoGallery(photos: photos.map { StoredPhoto(id: $0.id, data: $0.imageData) })
                 }
             }
             if !visit.salonName.isEmpty || !visit.stylistName.isEmpty || visit.price != nil {
@@ -227,7 +235,7 @@ struct SalonVisitForm: View {
     @State private var bookingURL: String
     @State private var priceText: String
     @State private var drafts: [TreatmentDraft]
-    @State private var newPhotos: [SalonPhotoDraft] = []
+    @State private var newPhotos: [PhotoDraft] = []
     @State private var removedPhotoIDs: Set<UUID> = []
     @State private var showingDetails: Bool
     @State private var errorMessage: String?
@@ -300,8 +308,8 @@ struct SalonVisitForm: View {
                     Text("同じ施術名の最新の来店日から、次回の目安を計算します。")
                 }
                 Section("写真（任意）") {
-                    SalonPhotoEditor(
-                        existing: existingPhotos,
+                    PhotoEditor(
+                        existing: existingPhotos.map { StoredPhoto(id: $0.id, data: $0.imageData) },
                         newPhotos: $newPhotos,
                         removedPhotoIDs: $removedPhotoIDs
                     )
