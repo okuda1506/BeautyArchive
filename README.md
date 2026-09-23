@@ -35,7 +35,7 @@ This creates small but recurring inconveniences:
 - Missing the right time to rebook or replace a product.
 - Having beauty appointments, records, and photos scattered across apps.
 
-Beauty Archive is being developed to bring those records and next actions together.
+B/ONE is being developed to bring those records and next actions together.
 
 Its concept is:
 
@@ -53,9 +53,9 @@ Know when to act next
 Book or purchase
 ```
 
-### What Beauty Archive aims to do
+### What B/ONE aims to do
 
-Beauty Archive is not intended to replace existing salon booking services or online stores. People can continue to use those services to book appointments and buy products. Beauty Archive supports the steps around them:
+B/ONE is not intended to replace existing salon booking services or online stores. People can continue to use those services to book appointments and buy products. B/ONE supports the steps around them:
 
 - Recording beauty history.
 - Saving photos and order details.
@@ -63,15 +63,15 @@ Beauty Archive is not intended to replace existing salon booking services or onl
 - Managing beauty appointments.
 - Providing paths back to booking and purchasing services.
 
-This makes Beauty Archive a **hub for managing beauty activities** across services.
+This makes B/ONE a **hub for managing beauty activities** across services.
 
 ### Approach to the iOS app
 
 The app is currently being developed exclusively for iOS. It uses SwiftUI and Apple platform capabilities to create a simple, polished experience that feels natural on iPhone.
 
-The planned data layer uses SwiftData and CloudKit / iCloud, without requiring a separate Beauty Archive account. Users should be able to begin using the app without a complicated sign-up process, with supported data synced across devices on the same Apple Account through iCloud.
+The planned data layer uses SwiftData and CloudKit / iCloud, without requiring a separate B/ONE account. Users should be able to begin using the app without a complicated sign-up process, with supported data synced across devices on the same Apple Account through iCloud.
 
-Google Calendar integration is also planned. A Google account will authorize access to calendar features only; it will not be used to sign in to Beauty Archive.
+Google Calendar integration is also planned. A Google account will authorize access to calendar features only; it will not be used to sign in to B/ONE.
 
 ### UI / UX principles
 
