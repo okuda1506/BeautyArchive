@@ -61,7 +61,7 @@ struct ContentView: View {
             }
 
             Tab(value: AppTab.items) {
-                DestinationPlaceholder(title: "アイテム", symbol: "bag")
+                ProductListView()
             } label: {
                 Image(systemName: "bag")
                     .accessibilityLabel("アイテム")
