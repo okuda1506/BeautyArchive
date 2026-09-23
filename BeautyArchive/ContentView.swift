@@ -24,6 +24,7 @@ struct ContentView: View {
     @Query private var products: [BeautyProduct]
     @Query private var productUnits: [ProductUnit]
     @State private var selectedTab: AppTab = .home
+    @State private var selectedVisitID: UUID?
     @State private var selectedProductID: UUID?
     @State private var notificationTask: Task<Void, Never>?
     @State private var notificationError: String?
@@ -81,6 +82,7 @@ struct ContentView: View {
                     salonReminderAdjustments: salonReminderAdjustments,
                     products: products,
                     selectedTab: $selectedTab,
+                    selectedVisitID: $selectedVisitID,
                     selectedProductID: $selectedProductID
                 )
             } label: {
@@ -89,7 +91,7 @@ struct ContentView: View {
             }
 
             Tab(value: AppTab.archive) {
-                SalonArchiveView()
+                SalonArchiveView(selectedVisitID: $selectedVisitID)
             } label: {
                 Image(systemName: "square.text.square")
                     .accessibilityLabel("記録")
@@ -191,6 +193,7 @@ private struct HomeView: View {
     let salonReminderAdjustments: [SalonReminderAdjustment]
     let products: [BeautyProduct]
     @Binding var selectedTab: AppTab
+    @Binding var selectedVisitID: UUID?
     @Binding var selectedProductID: UUID?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
@@ -412,6 +415,7 @@ private struct HomeView: View {
 
                 if action.kind == .salonNeedsBooking {
                     Button("前回の記録", systemImage: "chevron.right") {
+                        selectedVisitID = action.visitID
                         selectedTab = .archive
                     }
                     .font(.subheadline)

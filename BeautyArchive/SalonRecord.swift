@@ -165,6 +165,7 @@ enum SalonMaintenance {
                 date: adjustedDate,
                 imageData: firstPhotoByVisit[visit.id],
                 detail: detail,
+                visitID: visit.id,
                 destinationURL: bookingURL,
                 baselineDate: dueDate,
                 snoozedReminderDate: adjustment?.snoozedUntil,
