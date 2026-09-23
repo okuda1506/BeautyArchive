@@ -51,12 +51,17 @@ final class SalonTreatment {
     }
 }
 
+struct SalonTreatmentChoice: Identifiable {
+    let id: String
+    let name: String
+    let cycleDays: Int
+}
+
 enum SalonMaintenance {
-    static func actions(
+    private static func latestByName(
         visits: [SalonVisit],
-        treatments: [SalonTreatment],
-        calendar: Calendar = .current
-    ) -> [HomeAction] {
+        treatments: [SalonTreatment]
+    ) -> [String: (visit: SalonVisit, treatment: SalonTreatment)] {
         let visitsByID = Dictionary(uniqueKeysWithValues: visits.map { ($0.id, $0) })
         var latest: [String: (visit: SalonVisit, treatment: SalonTreatment)] = [:]
 
@@ -72,8 +77,29 @@ enum SalonMaintenance {
             }
             latest[key] = (visit, treatment)
         }
+        return latest
+    }
 
-        return latest.values.compactMap { pair in
+    static func treatmentChoices(
+        visits: [SalonVisit],
+        treatments: [SalonTreatment]
+    ) -> [SalonTreatmentChoice] {
+        latestByName(visits: visits, treatments: treatments).map { entry in
+            SalonTreatmentChoice(
+                id: entry.key,
+                name: entry.value.treatment.name,
+                cycleDays: entry.value.treatment.cycleDays
+            )
+        }
+        .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    static func actions(
+        visits: [SalonVisit],
+        treatments: [SalonTreatment],
+        calendar: Calendar = .current
+    ) -> [HomeAction] {
+        latestByName(visits: visits, treatments: treatments).values.compactMap { pair in
             let visit = pair.visit
             let treatment = pair.treatment
             guard let dueDate = calendar.date(

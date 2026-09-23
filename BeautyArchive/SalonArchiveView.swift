@@ -176,6 +176,8 @@ private struct TreatmentDraft: Identifiable {
 struct SalonVisitForm: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query private var savedVisits: [SalonVisit]
+    @Query private var savedTreatments: [SalonTreatment]
     let visit: SalonVisit?
     let existingTreatments: [SalonTreatment]
     @State private var date: Date
@@ -223,6 +225,19 @@ struct SalonVisitForm: View {
                                     }
                                     .labelStyle(.iconOnly)
                                     .tint(.red)
+                                }
+                            }
+                            if !treatmentChoices.isEmpty {
+                                Menu {
+                                    ForEach(treatmentChoices) { choice in
+                                        Button("\(choice.name) · \(choice.cycleDays)日") {
+                                            draft.name = choice.name
+                                            draft.cycleDays = choice.cycleDays
+                                        }
+                                    }
+                                } label: {
+                                    Label("過去の施術から選ぶ", systemImage: "clock.arrow.circlepath")
+                                        .font(.subheadline)
                                 }
                             }
                             Stepper("次回目安：\(draft.cycleDays)日後", value: $draft.cycleDays, in: 1...365)
@@ -304,6 +319,10 @@ struct SalonVisitForm: View {
                 .folding(options: [.caseInsensitive, .widthInsensitive], locale: .current)
         }.filter { !$0.isEmpty }
         return Set(names).count != names.count
+    }
+
+    private var treatmentChoices: [SalonTreatmentChoice] {
+        SalonMaintenance.treatmentChoices(visits: savedVisits, treatments: savedTreatments)
     }
 
     private var validBookingURL: URL? {
