@@ -4,6 +4,7 @@ struct HomeAction: Identifiable {
     enum Kind: Equatable {
         case salonNeedsBooking
         case salonBooked
+        case salonNeedsRecord
         case itemReplacement
     }
 

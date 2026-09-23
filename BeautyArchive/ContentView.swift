@@ -14,6 +14,8 @@ struct ContentView: View {
     @Query private var visits: [SalonVisit]
     @Query private var treatments: [SalonTreatment]
     @Query private var photos: [SalonPhoto]
+    @Query private var appointments: [BeautyAppointment]
+    @Query private var appointmentTreatments: [AppointmentTreatment]
     @State private var selectedTab: AppTab = .home
 
     init(actions: [HomeAction]? = nil) {
@@ -22,7 +24,11 @@ struct ContentView: View {
 
     private var actions: [HomeAction] {
         previewActions ?? SalonMaintenance.actions(
-            visits: visits, treatments: treatments, photos: photos
+            visits: visits,
+            treatments: treatments,
+            photos: photos,
+            appointments: appointments,
+            appointmentTreatments: appointmentTreatments
         )
     }
 
@@ -360,7 +366,9 @@ private struct HomeView: View {
         )
         switch action.kind {
         case .salonNeedsBooking: return "次回目安 \(dateText)"
-        case .salonBooked: return "予約済み · \(dateText)"
+        case .salonBooked:
+            return "予約済み · \(action.date.formatted(.dateTime.month().day().hour().minute()))"
+        case .salonNeedsRecord: return "予約日時を経過 · \(dateText)"
         case .itemReplacement: return "買い替え目安 \(dateText)"
         }
     }
@@ -376,6 +384,7 @@ private struct HomeView: View {
         switch action.kind {
         case .salonNeedsBooking: "予約する"
         case .salonBooked: "オーダーを準備"
+        case .salonNeedsRecord: "来店を記録"
         case .itemReplacement: "商品を見る"
         }
     }
@@ -384,6 +393,7 @@ private struct HomeView: View {
         switch action.kind {
         case .salonNeedsBooking: "calendar"
         case .salonBooked: "square.text.square"
+        case .salonNeedsRecord: "square.and.pencil"
         case .itemReplacement: "bag"
         }
     }
@@ -396,6 +406,8 @@ private struct HomeView: View {
             else { showingLinkNotice = true }
         case .salonBooked:
             selectedTab = .archive
+        case .salonNeedsRecord:
+            showingAddVisit = true
         case .itemReplacement:
             selectedTab = .items
         }
