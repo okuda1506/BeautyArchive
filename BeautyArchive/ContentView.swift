@@ -73,29 +73,13 @@ struct ContentView: View {
             }
 
             Tab(value: AppTab.settings) {
-                DestinationPlaceholder(title: "設定", symbol: "gearshape")
+                SettingsView()
             } label: {
                 Image(systemName: "gearshape")
                     .accessibilityLabel("設定")
             }
         }
         .tint(.primary)
-    }
-}
-
-private struct DestinationPlaceholder: View {
-    let title: String
-    let symbol: String
-
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView(
-                "準備中",
-                systemImage: symbol,
-                description: Text("\(title)の機能は今後追加します。")
-            )
-            .navigationTitle(title)
-        }
     }
 }
 
