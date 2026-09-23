@@ -370,6 +370,11 @@ private struct HomeView: View {
                         Text(dateSummary(for: action))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
+                        if action.kind == .salonNeedsBooking, let detail = action.detail {
+                            Text(detail)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     Spacer()
                     if action.kind == .salonNeedsBooking {

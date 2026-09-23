@@ -152,13 +152,19 @@ enum SalonMaintenance {
             let components = URLComponents(string: visit.bookingURL)
             let bookingURL: URL? = ["https", "http"].contains(components?.scheme?.lowercased() ?? "")
                 ? components?.url : nil
+            let previousDate = visit.date.formatted(
+                .dateTime.year().month().day().locale(Locale(identifier: "ja_JP"))
+            )
+            let detail = visit.salonName.isEmpty
+                ? "前回の施術 \(previousDate)"
+                : "前回の施術 \(previousDate) · \(visit.salonName)"
             return HomeAction(
                 id: treatment.id,
                 kind: .salonNeedsBooking,
                 title: treatment.name,
                 date: adjustedDate,
                 imageData: firstPhotoByVisit[visit.id],
-                detail: visit.salonName.isEmpty ? nil : visit.salonName,
+                detail: detail,
                 destinationURL: bookingURL,
                 baselineDate: dueDate,
                 snoozedReminderDate: adjustment?.snoozedUntil,
