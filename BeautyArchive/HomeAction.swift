@@ -15,6 +15,7 @@ struct HomeAction: Identifiable {
     let imageName: String?
     let imageData: Data?
     let detail: String?
+    let productID: UUID?
     let destinationURL: URL?
 
     init(
@@ -25,6 +26,7 @@ struct HomeAction: Identifiable {
         imageName: String? = nil,
         imageData: Data? = nil,
         detail: String? = nil,
+        productID: UUID? = nil,
         destinationURL: URL? = nil
     ) {
         self.id = id
@@ -34,6 +36,7 @@ struct HomeAction: Identifiable {
         self.imageName = imageName
         self.imageData = imageData
         self.detail = detail
+        self.productID = productID
         self.destinationURL = destinationURL
     }
 

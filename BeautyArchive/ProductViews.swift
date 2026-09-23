@@ -3,14 +3,16 @@ import SwiftData
 import SwiftUI
 
 struct ProductListView: View {
+    @Binding var selectedProductID: UUID?
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \BeautyProduct.createdAt, order: .reverse) private var products: [BeautyProduct]
     @Query private var units: [ProductUnit]
     @State private var showingAdd = false
     @State private var errorMessage: String?
+    @State private var path: [UUID] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if products.isEmpty {
                     ContentUnavailableView(
@@ -25,9 +27,7 @@ struct ProductListView: View {
                             if !categoryProducts.isEmpty {
                                 Section(category.title) {
                                     ForEach(categoryProducts) { product in
-                                        NavigationLink {
-                                            ProductDetail(product: product)
-                                        } label: {
+                                        NavigationLink(value: product.id) {
                                             HStack(spacing: 12) {
                                                 if let image = UIImage(data: product.imageData) {
                                                     Image(uiImage: image)
@@ -63,6 +63,13 @@ struct ProductListView: View {
                 }
             }
             .navigationTitle("アイテム")
+            .navigationDestination(for: UUID.self) { productID in
+                if let product = products.first(where: { $0.id == productID }) {
+                    ProductDetail(product: product)
+                } else {
+                    ContentUnavailableView("商品が見つかりません", systemImage: "bag")
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("商品を追加", systemImage: "plus") { showingAdd = true }
@@ -78,7 +85,18 @@ struct ProductListView: View {
             } message: {
                 Text(errorMessage ?? "")
             }
+            .onAppear { openSelectedProduct() }
+            .onChange(of: selectedProductID) { _, _ in openSelectedProduct() }
+            .onChange(of: products.map(\.id)) { _, _ in openSelectedProduct() }
         }
+    }
+
+    private func openSelectedProduct() {
+        guard let selectedProductID,
+              products.contains(where: { $0.id == selectedProductID })
+        else { return }
+        path = [selectedProductID]
+        self.selectedProductID = nil
     }
 
     private func delete(_ offsets: IndexSet, from categoryProducts: [BeautyProduct]) {
@@ -105,13 +123,6 @@ private struct ProductDetail: View {
 
     private var units: [ProductUnit] {
         allUnits.filter { $0.productID == product.id }
-    }
-
-    private var purchaseURL: URL? {
-        guard let url = URL(string: product.purchaseURL),
-              url.scheme?.lowercased() == "https", url.host != nil
-        else { return nil }
-        return url
     }
 
     var body: some View {
@@ -159,7 +170,7 @@ private struct ProductDetail: View {
                 }
                 Button("もう1本登録", systemImage: "plus") { showingAddUnit = true }
             }
-            if let url = purchaseURL {
+            if let url = product.validPurchaseURL {
                 Section("再購入") {
                     Link("購入先を開く", destination: url)
                 }

@@ -23,6 +23,7 @@ struct ContentView: View {
     @Query private var products: [BeautyProduct]
     @Query private var productUnits: [ProductUnit]
     @State private var selectedTab: AppTab = .home
+    @State private var selectedProductID: UUID?
     @State private var notificationTask: Task<Void, Never>?
     @State private var notificationError: String?
 
@@ -72,7 +73,8 @@ struct ContentView: View {
                     actions: actions,
                     appointments: appointments,
                     appointmentTreatments: appointmentTreatments,
-                    selectedTab: $selectedTab
+                    selectedTab: $selectedTab,
+                    selectedProductID: $selectedProductID
                 )
             } label: {
                 Image(systemName: "house.fill")
@@ -94,7 +96,7 @@ struct ContentView: View {
             }
 
             Tab(value: AppTab.items) {
-                ProductListView()
+                ProductListView(selectedProductID: $selectedProductID)
             } label: {
                 Image(systemName: "bag")
                     .accessibilityLabel("アイテム")
@@ -159,6 +161,7 @@ private struct HomeView: View {
     let appointments: [BeautyAppointment]
     let appointmentTreatments: [AppointmentTreatment]
     @Binding var selectedTab: AppTab
+    @Binding var selectedProductID: UUID?
     @Environment(\.openURL) private var openURL
     @State private var showingAllActions = false
     @State private var showingAddVisit = false
@@ -318,6 +321,14 @@ private struct HomeView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Color(uiColor: .label))
+
+                if action.kind == .itemReplacement, let url = action.destinationURL {
+                    Button("もう一度購入", systemImage: "arrow.up.right") {
+                        openURL(url)
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
 
                 if action.kind == .salonNeedsBooking {
                     Button("前回の記録", systemImage: "chevron.right") {
@@ -484,6 +495,7 @@ private struct HomeView: View {
             completingAppointment = appointments.first { $0.id == action.id }
             showingAddVisit = true
         case .itemReplacement:
+            selectedProductID = action.productID
             selectedTab = .items
         }
     }
