@@ -58,6 +58,11 @@ struct SalonTreatmentChoice: Identifiable {
 }
 
 enum SalonMaintenance {
+    private static func normalizedName(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .widthInsensitive], locale: .current)
+    }
+
     private static func latestByName(
         visits: [SalonVisit],
         treatments: [SalonTreatment]
@@ -67,8 +72,7 @@ enum SalonMaintenance {
 
         for treatment in treatments {
             guard let visit = visitsByID[treatment.visitID] else { continue }
-            let key = treatment.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                .folding(options: [.caseInsensitive, .widthInsensitive], locale: .current)
+            let key = normalizedName(treatment.name)
             guard !key.isEmpty else { continue }
             if let previous = latest[key] {
                 if previous.visit.date > visit.date { continue }
@@ -98,13 +102,37 @@ enum SalonMaintenance {
         visits: [SalonVisit],
         treatments: [SalonTreatment],
         photos: [SalonPhoto] = [],
+        appointments: [BeautyAppointment] = [],
+        appointmentTreatments: [AppointmentTreatment] = [],
+        referenceDate: Date = .now,
         calendar: Calendar = .current
     ) -> [HomeAction] {
+        let latest = latestByName(visits: visits, treatments: treatments)
         let firstPhotoByVisit = Dictionary(grouping: photos, by: \.visitID)
             .compactMapValues { group in
                 group.min { $0.sortOrder < $1.sortOrder }?.imageData
             }
-        return latestByName(visits: visits, treatments: treatments).values.compactMap { pair in
+        let namesByAppointment = Dictionary(grouping: appointmentTreatments, by: \.appointmentID)
+        var reservedNames: Set<String> = []
+        let appointmentActions: [HomeAction] = appointments.compactMap { appointment in
+            guard !appointment.isCancelled else { return nil }
+            let names = (namesByAppointment[appointment.id] ?? []).map(\.name)
+                .filter { !normalizedName($0).isEmpty }
+            guard !names.isEmpty else { return nil }
+            reservedNames.formUnion(names.map { normalizedName($0) })
+            let firstRelatedVisit = names.compactMap { latest[normalizedName($0)]?.visit }.first
+            return HomeAction(
+                id: appointment.id,
+                kind: appointment.startAt >= referenceDate ? .salonBooked : .salonNeedsRecord,
+                title: names.joined(separator: "・"),
+                date: appointment.startAt,
+                imageData: firstRelatedVisit.flatMap { firstPhotoByVisit[$0.id] },
+                detail: appointment.shopName.isEmpty ? nil : appointment.shopName
+            )
+        }
+        let dueActions: [HomeAction] = latest.compactMap { entry in
+            guard !reservedNames.contains(entry.key) else { return nil }
+            let pair = entry.value
             let visit = pair.visit
             let treatment = pair.treatment
             guard let dueDate = calendar.date(
@@ -125,6 +153,6 @@ enum SalonMaintenance {
                 destinationURL: bookingURL
             )
         }
-        .sorted { $0.date < $1.date }
+        return (appointmentActions + dueActions).sorted { $0.date < $1.date }
     }
 }
