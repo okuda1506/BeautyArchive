@@ -31,6 +31,10 @@ struct AppointmentListView: View {
                                             Text("キャンセル済み")
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
+                                        } else if appointment.isCompleted {
+                                            Text("記録済み")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
                                         }
                                     }
                                     Text(appointment.startAt, format: .dateTime.year().month().day().hour().minute())
@@ -98,13 +102,14 @@ private struct AppointmentDetail: View {
     var body: some View {
         List {
             Section("予約") {
-                LabeledContent("状態", value: appointment.isCancelled ? "キャンセル済み" : "予約済み")
+                LabeledContent("状態", value: appointment.isCancelled
+                    ? "キャンセル済み" : appointment.isCompleted ? "記録済み" : "予約済み")
                 LabeledContent("開始", value: appointment.startAt.formatted(date: .abbreviated, time: .shortened))
                 LabeledContent("終了", value: appointment.endAt.formatted(date: .abbreviated, time: .shortened))
                 if !appointment.shopName.isEmpty {
                     LabeledContent("店舗", value: appointment.shopName)
                 }
-                if !appointment.isCancelled && appointment.startAt < .now {
+                if !appointment.isCancelled && !appointment.isCompleted && appointment.startAt < .now {
                     Text("予定日時を過ぎています。施術記録を追加するまで、来店済みにはなりません。")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)

@@ -6,6 +6,7 @@ struct SalonArchiveView: View {
     @Query(sort: \SalonVisit.date, order: .reverse) private var visits: [SalonVisit]
     @Query private var treatments: [SalonTreatment]
     @Query private var photos: [SalonPhoto]
+    @Query private var appointments: [BeautyAppointment]
     @State private var showingAdd = false
     @State private var copyingFrom: SalonVisit?
     @State private var errorMessage: String?
@@ -128,6 +129,9 @@ struct SalonArchiveView: View {
             for photo in photos where photo.visitID == visit.id {
                 modelContext.delete(photo)
             }
+            for appointment in appointments where appointment.completedVisitID == visit.id {
+                appointment.completedVisitID = nil
+            }
             modelContext.delete(visit)
         }
         do { try modelContext.save() }
@@ -226,6 +230,7 @@ struct SalonVisitForm: View {
     @Query private var savedPhotos: [SalonPhoto]
     let visit: SalonVisit?
     let existingTreatments: [SalonTreatment]
+    let completingAppointment: BeautyAppointment?
     @State private var date: Date
     @State private var salonName: String
     @State private var stylistName: String
@@ -240,20 +245,36 @@ struct SalonVisitForm: View {
     @State private var showingDetails: Bool
     @State private var errorMessage: String?
 
-    init(visit: SalonVisit? = nil, treatments: [SalonTreatment] = [], copying: SalonVisit? = nil) {
+    init(
+        visit: SalonVisit? = nil,
+        treatments: [SalonTreatment] = [],
+        copying: SalonVisit? = nil,
+        completingAppointment: BeautyAppointment? = nil,
+        appointmentTreatments: [AppointmentTreatment] = []
+    ) {
         self.visit = visit
         self.existingTreatments = treatments
+        self.completingAppointment = completingAppointment
         _date = State(initialValue: visit?.date ?? .now)
-        _salonName = State(initialValue: visit?.salonName ?? copying?.salonName ?? "")
+        _salonName = State(initialValue:
+            visit?.salonName ?? copying?.salonName ?? completingAppointment?.shopName ?? "")
         _stylistName = State(initialValue: visit?.stylistName ?? copying?.stylistName ?? "")
         _orderNote = State(initialValue: visit?.orderNote ?? "")
         _impression = State(initialValue: visit?.impression ?? "")
         _nextVisitNote = State(initialValue: visit?.nextVisitNote ?? "")
         _bookingURL = State(initialValue: visit?.bookingURL ?? copying?.bookingURL ?? "")
         _priceText = State(initialValue: visit?.price.map(String.init) ?? "")
-        _drafts = State(initialValue: treatments.isEmpty
-            ? [TreatmentDraft()]
-            : treatments.map { TreatmentDraft(id: $0.id, name: $0.name, cycleDays: $0.cycleDays) })
+        if !treatments.isEmpty {
+            _drafts = State(initialValue: treatments.map {
+                TreatmentDraft(id: $0.id, name: $0.name, cycleDays: $0.cycleDays)
+            })
+        } else if !appointmentTreatments.isEmpty {
+            _drafts = State(initialValue: appointmentTreatments.map {
+                TreatmentDraft(name: $0.name)
+            })
+        } else {
+            _drafts = State(initialValue: [TreatmentDraft()])
+        }
         _showingDetails = State(initialValue: visit != nil || copying != nil)
     }
 
@@ -262,6 +283,11 @@ struct SalonVisitForm: View {
             Form {
                 Section("来店日") {
                     DatePicker("来店日", selection: $date, in: ...Date.now, displayedComponents: .date)
+                    if let completingAppointment {
+                        Text("予約日時：\(completingAppointment.startAt.formatted(date: .abbreviated, time: .shortened))。実際の来店日と施術を確認してください。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Section {
                     ForEach($drafts) { $draft in
@@ -410,6 +436,10 @@ struct SalonVisitForm: View {
         target.bookingURL = bookingURL.trimmingCharacters(in: .whitespacesAndNewlines)
         target.price = Int(priceText)
         if visit == nil { modelContext.insert(target) }
+        if visit == nil, let completingAppointment {
+            completingAppointment.completedVisitID = target.id
+            completingAppointment.updatedAt = .now
+        }
 
         let draftIDs = Set(drafts.map(\.id))
         for treatment in existingTreatments where !draftIDs.contains(treatment.id) {
