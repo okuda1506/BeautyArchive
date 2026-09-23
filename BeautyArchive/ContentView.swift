@@ -10,6 +10,10 @@ private enum AppTab: Hashable {
 }
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
+    @AppStorage(ReminderPreferences.leadChoiceKey) private var leadChoice = 0
+    @AppStorage(ReminderPreferences.customLeadDaysKey) private var customLeadDays = 2
     private let previewActions: [HomeAction]?
     @Query private var visits: [SalonVisit]
     @Query private var treatments: [SalonTreatment]
@@ -19,6 +23,8 @@ struct ContentView: View {
     @Query private var products: [BeautyProduct]
     @Query private var productUnits: [ProductUnit]
     @State private var selectedTab: AppTab = .home
+    @State private var notificationTask: Task<Void, Never>?
+    @State private var notificationError: String?
 
     init(actions: [HomeAction]? = nil) {
         self.previewActions = actions
@@ -35,6 +41,16 @@ struct ContentView: View {
         )
         let replacementActions = ProductReplacementActions.actions(products: products, units: productUnits)
         return (salonActions + replacementActions).sorted { $0.date < $1.date }
+    }
+
+    private var notificationSignature: String {
+        let unitChanges = productUnits.map {
+            "\($0.id.uuidString):\($0.updatedAt.timeIntervalSince1970):\($0.wantsReplacementNotification)"
+        }.sorted().joined(separator: "|")
+        let productChanges = products.map {
+            "\($0.id.uuidString):\($0.updatedAt.timeIntervalSince1970)"
+        }.sorted().joined(separator: "|")
+        return "\(remindersEnabled):\(leadChoice):\(customLeadDays):\(unitChanges):\(productChanges)"
     }
 
     var body: some View {
@@ -80,6 +96,39 @@ struct ContentView: View {
             }
         }
         .tint(.primary)
+        .onAppear { scheduleNotificationReconciliation() }
+        .onChange(of: notificationSignature) { _, _ in scheduleNotificationReconciliation() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { scheduleNotificationReconciliation() }
+        }
+        .alert("通知を予約できませんでした", isPresented: Binding(
+            get: { notificationError != nil },
+            set: { if !$0 { notificationError = nil } }
+        )) {
+            Button("閉じる", role: .cancel) { notificationError = nil }
+        } message: {
+            Text(notificationError ?? "")
+        }
+    }
+
+    @MainActor
+    private func scheduleNotificationReconciliation() {
+        guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
+        let previousTask = notificationTask
+        previousTask?.cancel()
+        notificationTask = Task {
+            await previousTask?.value
+            let error = await ProductNotificationScheduler.reconcile(
+                products: products,
+                units: productUnits,
+                enabled: remindersEnabled,
+                leadDays: ReminderPreferences.effectiveLeadDays(
+                    choice: leadChoice, customDays: customLeadDays
+                )
+            )
+            guard !Task.isCancelled else { return }
+            if let error { notificationError = error }
+        }
     }
 }
 

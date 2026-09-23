@@ -33,6 +33,7 @@ final class ProductUnit {
     var usesReplacementEstimate: Bool = false
     var manualUsageDays: Int? = nil
     var adjustedUsageDays: Int? = nil
+    var wantsReplacementNotification: Bool = false
     var createdAt: Date = Date.now
     var updatedAt: Date = Date.now
 
@@ -49,6 +50,7 @@ final class ProductUnit {
         usesReplacementEstimate: Bool = false,
         manualUsageDays: Int? = nil,
         adjustedUsageDays: Int? = nil,
+        wantsReplacementNotification: Bool = false,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -64,6 +66,7 @@ final class ProductUnit {
         self.usesReplacementEstimate = usesReplacementEstimate
         self.manualUsageDays = manualUsageDays
         self.adjustedUsageDays = adjustedUsageDays
+        self.wantsReplacementNotification = wantsReplacementNotification
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
