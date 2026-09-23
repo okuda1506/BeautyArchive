@@ -6,6 +6,7 @@ struct SalonArchiveView: View {
     @Query(sort: \SalonVisit.date, order: .reverse) private var visits: [SalonVisit]
     @Query private var treatments: [SalonTreatment]
     @State private var showingAdd = false
+    @State private var copyingFrom: SalonVisit?
     @State private var errorMessage: String?
 
     var body: some View {
@@ -45,12 +46,31 @@ struct SalonArchiveView: View {
             .navigationTitle("記録")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("美容院の記録を追加", systemImage: "plus") { showingAdd = true }
+                    if let latestVisit = visits.first {
+                        Menu {
+                            Button("新しく作成", systemImage: "square.and.pencil") {
+                                copyingFrom = nil
+                                showingAdd = true
+                            }
+                            Button("前回のサロン情報を使う", systemImage: "doc.on.doc") {
+                                copyingFrom = latestVisit
+                                showingAdd = true
+                            }
+                        } label: {
+                            Image(systemName: "plus")
+                                .accessibilityLabel("美容院の記録を追加")
+                        }
+                    } else {
+                        Button("美容院の記録を追加", systemImage: "plus") {
+                            copyingFrom = nil
+                            showingAdd = true
+                        }
                         .labelStyle(.iconOnly)
+                    }
                 }
             }
             .sheet(isPresented: $showingAdd) {
-                SalonVisitForm()
+                SalonVisitForm(copying: copyingFrom)
             }
             .alert("保存できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
@@ -169,16 +189,16 @@ struct SalonVisitForm: View {
     @State private var drafts: [TreatmentDraft]
     @State private var errorMessage: String?
 
-    init(visit: SalonVisit? = nil, treatments: [SalonTreatment] = []) {
+    init(visit: SalonVisit? = nil, treatments: [SalonTreatment] = [], copying: SalonVisit? = nil) {
         self.visit = visit
         self.existingTreatments = treatments
         _date = State(initialValue: visit?.date ?? .now)
-        _salonName = State(initialValue: visit?.salonName ?? "")
-        _stylistName = State(initialValue: visit?.stylistName ?? "")
+        _salonName = State(initialValue: visit?.salonName ?? copying?.salonName ?? "")
+        _stylistName = State(initialValue: visit?.stylistName ?? copying?.stylistName ?? "")
         _orderNote = State(initialValue: visit?.orderNote ?? "")
         _impression = State(initialValue: visit?.impression ?? "")
         _nextVisitNote = State(initialValue: visit?.nextVisitNote ?? "")
-        _bookingURL = State(initialValue: visit?.bookingURL ?? "")
+        _bookingURL = State(initialValue: visit?.bookingURL ?? copying?.bookingURL ?? "")
         _priceText = State(initialValue: visit?.price.map(String.init) ?? "")
         _drafts = State(initialValue: treatments.isEmpty
             ? [TreatmentDraft()]
