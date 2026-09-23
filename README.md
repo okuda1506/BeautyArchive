@@ -91,14 +91,14 @@ The planned initial release includes:
 - An in-app monthly calendar for beauty appointments, with optional Google Calendar integration.
 - Export of records and photos.
 
-**Available now:** Salon visit records and photos, hairstyle references and a stylist-facing summary, treatment timing, local beauty appointments in a monthly calendar, product and per-purchase usage records, and in-app replacement estimates. Home brings the next salon and product actions together.
+**Available now:** Salon visit records and photos, hairstyle references and a stylist-facing summary, treatment timing with a one-week notification snooze or a one-time due-date change, and local beauty appointments in a monthly calendar. Products support images, per-purchase usage records, replacement estimates and local reminders, and repurchase links. Home brings salon and product actions together. Settings provides local notification controls and a JSON export of records and saved photos.
 
-**Still planned:** Local notifications, iCloud sync, Google Calendar integration, product images, and export of records and photos. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
+**Still planned:** iCloud sync and Google Calendar integration. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
 
 ## Tech Stack
 
-- **Currently in the project:** Swift, SwiftUI, SwiftData, PhotosPicker, Xcode, and XCTest targets.
-- **Planned:** CloudKit, UserNotifications, Google OAuth, and the Google Calendar API.
+- **Currently in the project:** Swift, SwiftUI, SwiftData, PhotosPicker, UserNotifications, Xcode, and XCTest targets.
+- **Planned:** CloudKit, Google OAuth, and the Google Calendar API.
 
 The planned architecture is local-first, without a dedicated app backend for the initial release.
 
