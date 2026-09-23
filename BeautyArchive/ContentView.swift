@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 private enum AppTab: Hashable {
     case home
@@ -9,11 +10,17 @@ private enum AppTab: Hashable {
 }
 
 struct ContentView: View {
-    let actions: [HomeAction]
+    private let previewActions: [HomeAction]?
+    @Query private var visits: [SalonVisit]
+    @Query private var treatments: [SalonTreatment]
     @State private var selectedTab: AppTab = .home
 
-    init(actions: [HomeAction] = []) {
-        self.actions = actions
+    init(actions: [HomeAction]? = nil) {
+        self.previewActions = actions
+    }
+
+    private var actions: [HomeAction] {
+        previewActions ?? SalonMaintenance.actions(visits: visits, treatments: treatments)
     }
 
     var body: some View {
@@ -26,7 +33,7 @@ struct ContentView: View {
             }
 
             Tab(value: AppTab.archive) {
-                DestinationPlaceholder(title: "記録", symbol: "square.text.square")
+                SalonArchiveView()
             } label: {
                 Image(systemName: "square.text.square")
                     .accessibilityLabel("記録")
@@ -78,7 +85,7 @@ private struct HomeView: View {
     @Binding var selectedTab: AppTab
     @Environment(\.openURL) private var openURL
     @State private var showingAllActions = false
-    @State private var showingAddNotice = false
+    @State private var showingAddVisit = false
     @State private var showingLinkNotice = false
 
     private var upcoming: [HomeAction] { HomeAction.upcoming(from: actions) }
@@ -101,10 +108,8 @@ private struct HomeView: View {
             .sheet(isPresented: $showingAllActions) {
                 allActionsSheet
             }
-            .alert("記録の追加", isPresented: $showingAddNotice) {
-                Button("閉じる", role: .cancel) { }
-            } message: {
-                Text("記録作成機能は今後追加します。")
+            .sheet(isPresented: $showingAddVisit) {
+                SalonVisitForm()
             }
             .alert("予約先が未登録です", isPresented: $showingLinkNotice) {
                 Button("閉じる", role: .cancel) { }
@@ -134,7 +139,7 @@ private struct HomeView: View {
             Spacer(minLength: 12)
 
             Button {
-                showingAddNotice = true
+                showingAddVisit = true
             } label: {
                 Image(systemName: "plus")
                     .font(.title3.weight(.medium))
@@ -388,6 +393,7 @@ private struct HomeView: View {
 
 #Preview("Empty") {
     ContentView()
+        .modelContainer(for: [SalonVisit.self, SalonTreatment.self], inMemory: true)
 }
 
 #Preview("Upcoming actions") {
@@ -413,4 +419,5 @@ private struct HomeView: View {
             detail: "使用履歴から予測"
         )
     ])
+    .modelContainer(for: [SalonVisit.self, SalonTreatment.self], inMemory: true)
 }
