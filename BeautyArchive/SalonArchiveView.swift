@@ -5,6 +5,7 @@ struct SalonArchiveView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \SalonVisit.date, order: .reverse) private var visits: [SalonVisit]
     @Query private var treatments: [SalonTreatment]
+    @Query private var photos: [SalonPhoto]
     @State private var showingAdd = false
     @State private var copyingFrom: SalonVisit?
     @State private var errorMessage: String?
@@ -93,6 +94,9 @@ struct SalonArchiveView: View {
             for treatment in treatments where treatment.visitID == visit.id {
                 modelContext.delete(treatment)
             }
+            for photo in photos where photo.visitID == visit.id {
+                modelContext.delete(photo)
+            }
             modelContext.delete(visit)
         }
         do { try modelContext.save() }
@@ -106,10 +110,15 @@ struct SalonArchiveView: View {
 private struct SalonVisitDetail: View {
     let visit: SalonVisit
     @Query private var allTreatments: [SalonTreatment]
+    @Query private var allPhotos: [SalonPhoto]
     @State private var showingEdit = false
 
     private var treatments: [SalonTreatment] {
         allTreatments.filter { $0.visitID == visit.id }
+    }
+
+    private var photos: [SalonPhoto] {
+        allPhotos.filter { $0.visitID == visit.id }.sorted { $0.sortOrder < $1.sortOrder }
     }
 
     var body: some View {
@@ -118,6 +127,11 @@ private struct SalonVisitDetail: View {
                 LabeledContent("来店日", value: visit.date.formatted(date: .abbreviated, time: .omitted))
                 ForEach(treatments) { treatment in
                     LabeledContent(treatment.name, value: "\(treatment.cycleDays)日周期")
+                }
+            }
+            if !photos.isEmpty {
+                Section("写真") {
+                    SalonPhotoGallery(photos: photos)
                 }
             }
             if !visit.salonName.isEmpty || !visit.stylistName.isEmpty || visit.price != nil {
@@ -178,6 +192,7 @@ struct SalonVisitForm: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var savedVisits: [SalonVisit]
     @Query private var savedTreatments: [SalonTreatment]
+    @Query private var savedPhotos: [SalonPhoto]
     let visit: SalonVisit?
     let existingTreatments: [SalonTreatment]
     @State private var date: Date
@@ -189,6 +204,8 @@ struct SalonVisitForm: View {
     @State private var bookingURL: String
     @State private var priceText: String
     @State private var drafts: [TreatmentDraft]
+    @State private var newPhotos: [SalonPhotoDraft] = []
+    @State private var removedPhotoIDs: Set<UUID> = []
     @State private var showingDetails: Bool
     @State private var errorMessage: String?
 
@@ -258,6 +275,13 @@ struct SalonVisitForm: View {
                     Text("施術と次回目安")
                 } footer: {
                     Text("同じ施術名の最新の来店日から、次回の目安を計算します。")
+                }
+                Section("写真（任意）") {
+                    SalonPhotoEditor(
+                        existing: existingPhotos,
+                        newPhotos: $newPhotos,
+                        removedPhotoIDs: $removedPhotoIDs
+                    )
                 }
                 Section("オーダー（任意）") {
                     TextField("オーダー", text: $orderNote, axis: .vertical)
@@ -331,6 +355,11 @@ struct SalonVisitForm: View {
         SalonMaintenance.treatmentChoices(visits: savedVisits, treatments: savedTreatments)
     }
 
+    private var existingPhotos: [SalonPhoto] {
+        guard let visit else { return [] }
+        return savedPhotos.filter { $0.visitID == visit.id }.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
     private var validBookingURL: URL? {
         let components = URLComponents(string: bookingURL)
         guard ["https", "http"].contains(components?.scheme?.lowercased() ?? ""),
@@ -363,6 +392,17 @@ struct SalonVisitForm: View {
             treatment.name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
             treatment.cycleDays = draft.cycleDays
             if existingByID[draft.id] == nil { modelContext.insert(treatment) }
+        }
+        for photo in existingPhotos where removedPhotoIDs.contains(photo.id) {
+            modelContext.delete(photo)
+        }
+        let nextSortOrder = (existingPhotos.map(\.sortOrder).max() ?? -1) + 1
+        for (index, draft) in newPhotos.enumerated() {
+            modelContext.insert(SalonPhoto(
+                visitID: target.id,
+                sortOrder: nextSortOrder + index,
+                imageData: draft.data
+            ))
         }
         do {
             try modelContext.save()
