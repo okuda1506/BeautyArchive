@@ -14,6 +14,6 @@ struct BeautyArchiveApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [SalonVisit.self, SalonTreatment.self])
+        .modelContainer(for: [SalonVisit.self, SalonTreatment.self, SalonPhoto.self])
     }
 }

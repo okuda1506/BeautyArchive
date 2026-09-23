@@ -393,7 +393,7 @@ private struct HomeView: View {
 
 #Preview("Empty") {
     ContentView()
-        .modelContainer(for: [SalonVisit.self, SalonTreatment.self], inMemory: true)
+        .modelContainer(for: [SalonVisit.self, SalonTreatment.self, SalonPhoto.self], inMemory: true)
 }
 
 #Preview("Upcoming actions") {
@@ -419,5 +419,5 @@ private struct HomeView: View {
             detail: "使用履歴から予測"
         )
     ])
-    .modelContainer(for: [SalonVisit.self, SalonTreatment.self], inMemory: true)
+    .modelContainer(for: [SalonVisit.self, SalonTreatment.self, SalonPhoto.self], inMemory: true)
 }
