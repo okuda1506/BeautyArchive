@@ -164,6 +164,25 @@ struct ContentView: View {
 }
 
 private struct HomeView: View {
+    private enum HomeAlert {
+        case missingBookingURL
+        case adjustmentFailure(String)
+
+        var title: String {
+            switch self {
+            case .missingBookingURL: "予約先が未登録です"
+            case .adjustmentFailure: "目安を変更できませんでした"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .missingBookingURL: "記録に予約先のURLを登録すると、ここから開けるようになります。"
+            case .adjustmentFailure(let detail): detail
+            }
+        }
+    }
+
     @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
     let actions: [HomeAction]
     let appointments: [BeautyAppointment]
@@ -176,10 +195,9 @@ private struct HomeView: View {
     @State private var showingAllActions = false
     @State private var showingAddVisit = false
     @State private var completingAppointment: BeautyAppointment?
-    @State private var showingLinkNotice = false
+    @State private var homeAlert: HomeAlert?
     @State private var editingDueAction: HomeAction?
     @State private var editedDueDate = Date.now
-    @State private var adjustmentError: String?
 
     private var upcoming: [HomeAction] { HomeAction.upcoming(from: actions) }
     private var calendar: Calendar { .current }
@@ -212,18 +230,13 @@ private struct HomeView: View {
             .sheet(item: $editingDueAction) { action in
                 dueDateEditor(for: action)
             }
-            .alert("予約先が未登録です", isPresented: $showingLinkNotice) {
-                Button("閉じる", role: .cancel) { }
-            } message: {
-                Text("記録に予約先のURLを登録すると、ここから開けるようになります。")
-            }
-            .alert("目安を変更できませんでした", isPresented: Binding(
-                get: { adjustmentError != nil },
-                set: { if !$0 { adjustmentError = nil } }
+            .alert(homeAlert?.title ?? "", isPresented: Binding(
+                get: { homeAlert != nil },
+                set: { if !$0 { homeAlert = nil } }
             )) {
-                Button("閉じる", role: .cancel) { adjustmentError = nil }
+                Button("閉じる", role: .cancel) { homeAlert = nil }
             } message: {
-                Text(adjustmentError ?? "")
+                Text(homeAlert?.message ?? "")
             }
         }
     }
@@ -532,7 +545,7 @@ private struct HomeView: View {
         switch action.kind {
         case .salonNeedsBooking:
             if let url = action.destinationURL { openURL(url) }
-            else { showingLinkNotice = true }
+            else { homeAlert = .missingBookingURL }
         case .salonBooked:
             selectedTab = .archive
         case .salonNeedsRecord:
@@ -624,7 +637,6 @@ private struct HomeView: View {
         change: (SalonReminderAdjustment) -> Void
     ) {
         guard let baselineDate = action.baselineDate else { return }
-        adjustmentError = nil
         let existing = salonReminderAdjustments.first { $0.treatmentID == action.id }
         let adjustment = existing ?? SalonReminderAdjustment(
             treatmentID: action.id, baseDueDate: baselineDate
@@ -640,7 +652,7 @@ private struct HomeView: View {
         do { try modelContext.save() }
         catch {
             modelContext.rollback()
-            adjustmentError = error.localizedDescription
+            homeAlert = .adjustmentFailure(error.localizedDescription)
         }
     }
 
@@ -650,7 +662,7 @@ private struct HomeView: View {
         do { try modelContext.save() }
         catch {
             modelContext.rollback()
-            adjustmentError = error.localizedDescription
+            homeAlert = .adjustmentFailure(error.localizedDescription)
         }
     }
 }
