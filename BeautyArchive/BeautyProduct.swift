@@ -23,6 +23,7 @@ final class BeautyProduct {
     var categoryRaw: String = ProductCategory.cosmetics.rawValue
     var purchaseURL: String = ""
     var note: String = ""
+    @Attribute(.externalStorage) var imageData: Data = Data()
     var createdAt: Date = Date.now
     var updatedAt: Date = Date.now
 
@@ -33,6 +34,7 @@ final class BeautyProduct {
         category: ProductCategory,
         purchaseURL: String = "",
         note: String = "",
+        imageData: Data = Data(),
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -42,6 +44,7 @@ final class BeautyProduct {
         self.categoryRaw = category.rawValue
         self.purchaseURL = purchaseURL
         self.note = note
+        self.imageData = imageData
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

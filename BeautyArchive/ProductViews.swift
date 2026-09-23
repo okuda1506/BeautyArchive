@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftData
 import SwiftUI
 
@@ -27,12 +28,28 @@ struct ProductListView: View {
                                         NavigationLink {
                                             ProductDetail(product: product)
                                         } label: {
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text(product.name).font(.headline)
-                                                if !product.brand.isEmpty {
-                                                    Text(product.brand)
-                                                        .font(.subheadline)
-                                                        .foregroundStyle(.secondary)
+                                            HStack(spacing: 12) {
+                                                if let image = UIImage(data: product.imageData) {
+                                                    Image(uiImage: image)
+                                                        .resizable()
+                                                        .scaledToFill()
+                                                        .frame(width: 60, height: 60)
+                                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                                        .accessibilityHidden(true)
+                                                } else {
+                                                    Image(systemName: "bag")
+                                                        .frame(width: 60, height: 60)
+                                                        .background(Color(uiColor: .tertiarySystemGroupedBackground))
+                                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                                        .accessibilityHidden(true)
+                                                }
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    Text(product.name).font(.headline)
+                                                    if !product.brand.isEmpty {
+                                                        Text(product.brand)
+                                                            .font(.subheadline)
+                                                            .foregroundStyle(.secondary)
+                                                    }
                                                 }
                                             }
                                             .padding(.vertical, 3)
@@ -99,6 +116,14 @@ private struct ProductDetail: View {
 
     var body: some View {
         List {
+            if !product.imageData.isEmpty {
+                Section("商品画像") {
+                    PhotoGallery(
+                        photos: [StoredPhoto(id: product.id, data: product.imageData)],
+                        thumbnailSize: 220
+                    )
+                }
+            }
             Section("商品") {
                 LabeledContent("カテゴリ", value: product.category.title)
                 if !product.brand.isEmpty {
@@ -180,6 +205,9 @@ private struct ProductForm: View {
     @State private var category: ProductCategory
     @State private var purchaseURL: String
     @State private var note: String
+    @State private var imageData: Data
+    @State private var selectedImage: PhotosPickerItem?
+    @State private var isLoadingImage = false
     @State private var errorMessage: String?
 
     init(product: BeautyProduct? = nil) {
@@ -189,6 +217,7 @@ private struct ProductForm: View {
         _category = State(initialValue: product?.category ?? .cosmetics)
         _purchaseURL = State(initialValue: product?.purchaseURL ?? "")
         _note = State(initialValue: product?.note ?? "")
+        _imageData = State(initialValue: product?.imageData ?? Data())
     }
 
     private var trimmedURL: String {
@@ -221,6 +250,25 @@ private struct ProductForm: View {
                         }
                     }
                 }
+                Section("商品画像（任意）") {
+                    if let image = UIImage(data: imageData) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 220)
+                            .accessibilityLabel("選択中の商品画像")
+                        Button("画像を削除", role: .destructive) { imageData = Data() }
+                    }
+                    PhotosPicker(selection: $selectedImage, matching: .images) {
+                        Label(imageData.isEmpty ? "画像を追加" : "画像を変更", systemImage: "photo")
+                    }
+                    .disabled(isLoadingImage)
+                    .onChange(of: selectedImage) { _, item in
+                        guard let item else { return }
+                        Task { await importImage(item) }
+                    }
+                    if isLoadingImage { ProgressView("画像を読み込み中") }
+                }
                 Section("再購入先（任意）") {
                     TextField("https://", text: $purchaseURL)
                         .textContentType(.URL)
@@ -244,10 +292,10 @@ private struct ProductForm: View {
                     Button("キャンセル") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }.disabled(!isValid)
+                    Button("保存") { save() }.disabled(!isValid || isLoadingImage)
                 }
             }
-            .alert("保存できませんでした", isPresented: Binding(
+            .alert("操作を完了できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
             )) {
@@ -255,6 +303,28 @@ private struct ProductForm: View {
             } message: {
                 Text(errorMessage ?? "")
             }
+        }
+    }
+
+    @MainActor
+    private func importImage(_ item: PhotosPickerItem) async {
+        guard !isLoadingImage else { return }
+        isLoadingImage = true
+        defer {
+            selectedImage = nil
+            isLoadingImage = false
+        }
+        do {
+            guard let original = try await item.loadTransferable(type: Data.self),
+                  let optimized = await Task.detached(priority: .userInitiated, operation: {
+                      PhotoImageProcessor.optimizedJPEG(original)
+                  }).value else {
+                errorMessage = "画像を読み込めませんでした。別の画像を選んでください。"
+                return
+            }
+            imageData = optimized
+        } catch {
+            errorMessage = "画像を読み込めませんでした。\(error.localizedDescription)"
         }
     }
 
@@ -266,6 +336,7 @@ private struct ProductForm: View {
         target.categoryRaw = category.rawValue
         target.purchaseURL = trimmedURL
         target.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        target.imageData = imageData
         target.updatedAt = .now
         if product == nil { modelContext.insert(target) }
         do {
