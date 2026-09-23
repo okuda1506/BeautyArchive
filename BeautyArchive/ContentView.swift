@@ -265,7 +265,7 @@ private struct HomeView: View {
     private var header: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Beauty Archive")
+                Text("B/ONE")
                     .font(.system(size: 34, weight: .regular, design: .serif))
                     .minimumScaleFactor(0.8)
                     .lineLimit(1)

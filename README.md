@@ -4,7 +4,19 @@
 
 ## Overview
 
-Beauty Archive is an iOS app for keeping beauty records, schedules, and next actions together. The app is under development: salon records, local appointments, product histories, and in-app next-action estimates are available. Requirements may change as the project develops.
+B/ONE is a personal beauty management platform that brings beauty records, schedules, photos, and reminders together. Requirements may change as the project develops.
+
+## What is B/ONE?
+
+B/ONE brings salon treatment history, hairstyle reference photos, cosmetics and fragrance management, maintenance timing, and Google Calendar events into one place.
+
+Beauty information is often scattered across multiple apps and services. B/ONE aims to connect the full sequence naturally:
+
+**Record → Review → Know when to act next → Book or purchase**
+
+B/ONE is not intended to replace salon booking services or online stores. It is designed as a **hub for managing the beauty experience around those existing services**.
+
+> **Beauty, all in one.**
 
 ## Background
 
