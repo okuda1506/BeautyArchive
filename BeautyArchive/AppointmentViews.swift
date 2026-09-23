@@ -5,50 +5,32 @@ struct AppointmentListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \BeautyAppointment.startAt) private var appointments: [BeautyAppointment]
     @Query private var treatments: [AppointmentTreatment]
+    @State private var selectedDate = Date.now
     @State private var showingAdd = false
     @State private var errorMessage: String?
 
+    private var selectedAppointments: [BeautyAppointment] {
+        appointments.filter { Calendar.current.isDate($0.startAt, inSameDayAs: selectedDate) }
+    }
+
     var body: some View {
         NavigationStack {
-            Group {
-                if appointments.isEmpty {
-                    ContentUnavailableView(
-                        "美容予定はまだありません",
-                        systemImage: "calendar",
-                        description: Text("予約した日時と施術を登録できます。")
-                    )
-                } else {
-                    List {
-                        ForEach(appointments) { appointment in
+            List {
+                MonthCalendarView(selectedDate: $selectedDate, appointments: appointments)
+                    .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+
+                Section(selectedDate.formatted(date: .complete, time: .omitted)) {
+                    if selectedAppointments.isEmpty {
+                        Text(appointments.isEmpty
+                            ? "美容予定はまだありません。右上の＋から追加できます。"
+                            : "この日の予定はありません")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(selectedAppointments) { appointment in
                             NavigationLink {
-                                AppointmentDetail(appointment: appointment)
+                                AppointmentDetail(appointment: appointment) { selectedDate = $0 }
                             } label: {
-                                VStack(alignment: .leading, spacing: 5) {
-                                    HStack {
-                                        Text(appointment.title).font(.headline)
-                                        Spacer()
-                                        if appointment.isCancelled {
-                                            Text("キャンセル済み")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        } else if appointment.isCompleted {
-                                            Text("記録済み")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    Text(appointment.startAt, format: .dateTime.year().month().day().hour().minute())
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                    let names = treatments.filter { $0.appointmentID == appointment.id }
-                                        .map(\.name).joined(separator: "・")
-                                    if !names.isEmpty {
-                                        Text(names)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                .padding(.vertical, 4)
+                                appointmentRow(appointment)
                             }
                         }
                         .onDelete(perform: delete)
@@ -62,7 +44,9 @@ struct AppointmentListView: View {
                         .labelStyle(.iconOnly)
                 }
             }
-            .sheet(isPresented: $showingAdd) { AppointmentForm() }
+            .sheet(isPresented: $showingAdd) {
+                AppointmentForm { selectedDate = $0 }
+            }
             .alert("削除できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -74,9 +58,38 @@ struct AppointmentListView: View {
         }
     }
 
+    private func appointmentRow(_ appointment: BeautyAppointment) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(appointment.title).font(.headline)
+                Spacer()
+                if appointment.isCancelled {
+                    Text("キャンセル済み")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if appointment.isCompleted {
+                    Text("記録済み")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Text(appointment.startAt, format: .dateTime.hour().minute())
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            let names = treatments.filter { $0.appointmentID == appointment.id }
+                .map(\.name).joined(separator: "・")
+            if !names.isEmpty {
+                Text(names)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
     private func delete(at offsets: IndexSet) {
         for index in offsets {
-            let appointment = appointments[index]
+            let appointment = selectedAppointments[index]
             for treatment in treatments where treatment.appointmentID == appointment.id {
                 modelContext.delete(treatment)
             }
@@ -90,8 +103,95 @@ struct AppointmentListView: View {
     }
 }
 
+private struct MonthCalendarView: View {
+    @Binding var selectedDate: Date
+    let appointments: [BeautyAppointment]
+
+    private let calendar = Calendar.current
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+
+    private var monthStart: Date {
+        let components = calendar.dateComponents([.year, .month], from: selectedDate)
+        return calendar.date(from: components) ?? calendar.startOfDay(for: selectedDate)
+    }
+
+    private var weekdays: [String] {
+        let symbols = calendar.veryShortStandaloneWeekdaySymbols
+        let first = calendar.firstWeekday - 1
+        return Array(symbols[first...] + symbols[..<first])
+    }
+
+    private var days: [Date?] {
+        let leading = (calendar.component(.weekday, from: monthStart) - calendar.firstWeekday + 7) % 7
+        let count = calendar.range(of: .day, in: .month, for: monthStart)?.count ?? 0
+        return Array(repeating: nil, count: leading)
+            + (0..<count).map { calendar.date(byAdding: .day, value: $0, to: monthStart) }
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Button("前の月", systemImage: "chevron.left") { changeMonth(by: -1) }
+                    .labelStyle(.iconOnly)
+                Spacer()
+                Text(monthStart, format: .dateTime.year().month())
+                    .font(.headline)
+                Spacer()
+                Button("次の月", systemImage: "chevron.right") { changeMonth(by: 1) }
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.plain)
+
+            LazyVGrid(columns: columns, spacing: 4) {
+                ForEach(Array(weekdays.enumerated()), id: \.offset) { item in
+                    Text(item.element)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 24)
+                }
+                ForEach(Array(days.enumerated()), id: \.offset) { item in
+                    if let date = item.element {
+                        dayButton(for: date)
+                    } else {
+                        Color.clear.frame(minHeight: 48)
+                    }
+                }
+            }
+        }
+    }
+
+    private func dayButton(for date: Date) -> some View {
+        let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
+        let hasAppointment = appointments.contains { calendar.isDate($0.startAt, inSameDayAs: date) }
+        return Button {
+            selectedDate = date
+        } label: {
+            VStack(spacing: 3) {
+                Text(date, format: .dateTime.day())
+                    .font(.subheadline)
+                    .foregroundStyle(isSelected ? Color(uiColor: .systemBackground) : Color.primary)
+                    .frame(width: 34, height: 34)
+                    .background(isSelected ? Color.primary : Color.clear, in: Circle())
+                Circle()
+                    .fill(hasAppointment ? (isSelected ? Color.primary : Color.accentColor) : Color.clear)
+                    .frame(width: 5, height: 5)
+            }
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(date.formatted(date: .complete, time: .omitted))\(hasAppointment ? "、予定あり" : "")")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func changeMonth(by offset: Int) {
+        selectedDate = calendar.date(byAdding: .month, value: offset, to: monthStart) ?? selectedDate
+    }
+}
+
 private struct AppointmentDetail: View {
     let appointment: BeautyAppointment
+    let onSave: (Date) -> Void
     @Query private var allTreatments: [AppointmentTreatment]
     @State private var showingEdit = false
 
@@ -129,7 +229,7 @@ private struct AppointmentDetail: View {
             }
         }
         .sheet(isPresented: $showingEdit) {
-            AppointmentForm(appointment: appointment, treatments: treatments)
+            AppointmentForm(appointment: appointment, treatments: treatments, onSave: onSave)
         }
     }
 }
@@ -149,6 +249,7 @@ struct AppointmentForm: View {
     @Environment(\.dismiss) private var dismiss
     let appointment: BeautyAppointment?
     let existingTreatments: [AppointmentTreatment]
+    let onSave: (Date) -> Void
     @State private var title: String
     @State private var startAt: Date
     @State private var endAt: Date
@@ -158,9 +259,14 @@ struct AppointmentForm: View {
     @State private var drafts: [AppointmentTreatmentDraft]
     @State private var errorMessage: String?
 
-    init(appointment: BeautyAppointment? = nil, treatments: [AppointmentTreatment] = []) {
+    init(
+        appointment: BeautyAppointment? = nil,
+        treatments: [AppointmentTreatment] = [],
+        onSave: @escaping (Date) -> Void = { _ in }
+    ) {
         self.appointment = appointment
         self.existingTreatments = treatments
+        self.onSave = onSave
         let defaultStart = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now
         _title = State(initialValue: appointment?.title ?? "")
         _startAt = State(initialValue: appointment?.startAt ?? defaultStart)
@@ -283,6 +389,7 @@ struct AppointmentForm: View {
         }
         do {
             try modelContext.save()
+            onSave(target.startAt)
             dismiss()
         } catch {
             modelContext.rollback()
