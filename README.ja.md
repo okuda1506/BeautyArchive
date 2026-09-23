@@ -1,4 +1,4 @@
-# Beauty Archive
+# B/ONE
 
 [English](README.md)
 
