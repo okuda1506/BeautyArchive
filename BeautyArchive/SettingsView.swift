@@ -1,3 +1,4 @@
+import CloudKit
 import SwiftData
 import SwiftUI
 import UIKit
@@ -12,6 +13,7 @@ struct SettingsView: View {
     @AppStorage(ReminderPreferences.customLeadDaysKey) private var customLeadDays = 2
     @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @State private var isLoadingAuthorization = true
+    @State private var iCloudStatus: CKAccountStatus?
     @State private var errorMessage: String?
     @State private var isExporting = false
     @State private var exportedURL: URL?
@@ -66,6 +68,12 @@ struct SettingsView: View {
                     Text("美容の目安は通知をオフにしてもHomeで確認できます。")
                         .foregroundStyle(.secondary)
                 }
+                Section("iCloud") {
+                    Text(iCloudDescription)
+                    Text("記録はこの端末に保存されます。iCloudの利用可否は同期完了や他の端末への反映を示すものではありません。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Section("データの書き出し") {
                     Button("記録と写真のファイルを作成", systemImage: "square.and.arrow.up") {
                         Task { await exportData() }
@@ -84,8 +92,17 @@ struct SettingsView: View {
             }
             .navigationTitle("設定")
             .task { await refreshAuthorization() }
+            .task { await refreshICloudStatus() }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { Task { await refreshAuthorization() } }
+                if phase == .active {
+                    Task {
+                        await refreshAuthorization()
+                        await refreshICloudStatus()
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .CKAccountChanged)) { _ in
+                Task { await refreshICloudStatus() }
             }
             .alert("操作を完了できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
@@ -123,6 +140,27 @@ struct SettingsView: View {
         case .denied: "この端末では通知が許可されていません。"
         case .authorized, .provisional, .ephemeral: "この端末で通知が許可されています。"
         @unknown default: "通知の許可状態を確認できません。"
+        }
+    }
+
+    private var iCloudDescription: String {
+        switch iCloudStatus {
+        case .available: "この端末ではiCloudを利用できます。"
+        case .noAccount: "iCloudにサインインすると、対応端末間の同期を利用できます。"
+        case .restricted: "この端末ではiCloudへのアクセスが制限されています。"
+        case .temporarilyUnavailable: "iCloudは現在一時的に利用できません。"
+        case .couldNotDetermine: "iCloudの利用状況を確認できませんでした。"
+        case nil: "iCloudの利用状況を確認中です。"
+        @unknown default: "iCloudの利用状況を確認できませんでした。"
+        }
+    }
+
+    @MainActor
+    private func refreshICloudStatus() async {
+        do {
+            iCloudStatus = try await CKContainer.default().accountStatus()
+        } catch {
+            iCloudStatus = .couldNotDetermine
         }
     }
 
