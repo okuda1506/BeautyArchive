@@ -4,7 +4,7 @@
 
 ## Overview
 
-Beauty Archive is an iOS app for keeping beauty records, schedules, and next actions together. Development is at an early stage; the current app is a SwiftUI starter screen, and the features below describe the planned initial release. Requirements may change as the project develops.
+Beauty Archive is an iOS app for keeping beauty records, schedules, and next actions together. The app is under development: salon records, local appointments, product histories, and in-app next-action estimates are available. Requirements may change as the project develops.
 
 ## Background
 
@@ -91,20 +91,22 @@ The planned initial release includes:
 - An in-app monthly calendar for beauty appointments, with optional Google Calendar integration.
 - Export of records and photos.
 
-These features are not implemented yet. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
+**Available now:** Salon visit records and photos, hairstyle references and a stylist-facing summary, treatment timing, local beauty appointments in a monthly calendar, product and per-purchase usage records, and in-app replacement estimates. Home brings the next salon and product actions together.
+
+**Still planned:** Local notifications, iCloud sync, Google Calendar integration, product images, and export of records and photos. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
 
 ## Tech Stack
 
-- **Currently in the project:** Swift, SwiftUI, Xcode, and XCTest targets.
-- **Planned:** SwiftData, CloudKit, UserNotifications, PhotosPicker, Google OAuth, and the Google Calendar API.
+- **Currently in the project:** Swift, SwiftUI, SwiftData, PhotosPicker, Xcode, and XCTest targets.
+- **Planned:** CloudKit, UserNotifications, Google OAuth, and the Google Calendar API.
 
 The planned architecture is local-first, without a dedicated app backend for the initial release.
 
 ## Local Setup
 
 1. Install Xcode on macOS and make an iOS 26.5 or later simulator available. The Xcode project currently sets iOS 26.5 as its deployment target.
-2. Clone this private repository: `git clone https://github.com/okuda1506/BeautyArchive.git` (GitHub access is required).
+2. Clone the repository: `git clone https://github.com/okuda1506/BeautyArchive.git`.
 3. Open `BeautyArchive.xcodeproj` in Xcode.
 4. Select the `BeautyArchive` scheme and an available simulator, then run the app.
 
-The current app displays a starter screen. Google Calendar credentials and other integrations are not required to run it at this stage.
+The app stores current records locally. Google Calendar credentials and other integrations are not required to run it at this stage.

@@ -4,7 +4,7 @@
 
 ## 概要
 
-Beauty Archiveは、美容の記録・予定・次の行動を一か所で管理するiOSアプリです。現在は開発初期段階で、アプリ本体はSwiftUIの初期画面です。以下の機能は初期リリースに向けた計画であり、開発に伴って仕様が変わる場合があります。
+Beauty Archiveは、美容の記録・予定・次の行動を一か所で管理するiOSアプリです。開発中のアプリでは、美容院の記録、アプリ内の予定、商品と使用履歴、次の行動の目安を利用できます。仕様は開発に伴って変わる場合があります。
 
 ## 開発背景
 
@@ -112,20 +112,22 @@ Google Calendar との連携も予定しているが、Google アカウントは
 - 美容予定を管理するアプリ内の月間カレンダーと、任意のGoogle Calendar連携。
 - 記録と写真の書き出し。
 
-これらの機能は現時点では未実装です。メーカー表示の期限や開封後の使用期限の管理は初期リリースに含めません。
+**現在利用できる機能：** 美容院の来店記録と写真、髪型の参考写真と美容師に見せる画面、施術ごとの次回目安、アプリ内の美容予定と月間カレンダー、化粧品・香水の商品台帳と購入単位の使用履歴、アプリ内の買い替え目安。Homeには美容院と商品の次の行動をまとめて表示します。
+
+**今後実装する機能：** ローカル通知、iCloud同期、Google Calendar連携、商品画像、記録と写真の書き出し。メーカー表示の期限や開封後の使用期限の管理は初期リリースに含めません。
 
 ## 技術スタック
 
-- **現在のプロジェクト:** Swift、SwiftUI、Xcode、XCTestのテストターゲット。
-- **導入予定:** SwiftData、CloudKit、UserNotifications、PhotosPicker、Google OAuth、Google Calendar API。
+- **現在のプロジェクト:** Swift、SwiftUI、SwiftData、PhotosPicker、Xcode、XCTestのテストターゲット。
+- **導入予定:** CloudKit、UserNotifications、Google OAuth、Google Calendar API。
 
 初期リリースは専用バックエンドを持たないローカルファースト構成を想定しています。
 
 ## ローカル環境構築
 
 1. macOSにXcodeをインストールし、iOS 26.5以降のシミュレータを利用できるようにします。現時点のXcodeプロジェクトのデプロイメントターゲットはiOS 26.5です。
-2. 非公開リポジトリをクローンします: `git clone https://github.com/okuda1506/BeautyArchive.git`（GitHubへのアクセス権が必要です）。
+2. リポジトリをクローンします: `git clone https://github.com/okuda1506/BeautyArchive.git`。
 3. Xcodeで`BeautyArchive.xcodeproj`を開きます。
 4. `BeautyArchive`スキームと利用可能なシミュレータを選択して実行します。
 
-現在のアプリには初期画面が表示されます。この段階ではGoogle Calendarの認証情報やその他の連携設定は不要です。
+現在の記録は端末内に保存されます。この段階ではGoogle Calendarの認証情報やその他の連携設定は不要です。
