@@ -122,6 +122,11 @@ private struct ProductDetail: View {
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                 }
+                                if let estimate = ReplacementEstimate.calculate(for: unit, among: allUnits) {
+                                    Text("買い替え目安：\(estimate.date.formatted(date: .abbreviated, time: .omitted))")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
