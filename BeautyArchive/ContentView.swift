@@ -79,6 +79,7 @@ struct ContentView: View {
                     appointments: appointments,
                     appointmentTreatments: appointmentTreatments,
                     salonReminderAdjustments: salonReminderAdjustments,
+                    products: products,
                     selectedTab: $selectedTab,
                     selectedProductID: $selectedProductID
                 )
@@ -188,6 +189,7 @@ private struct HomeView: View {
     let appointments: [BeautyAppointment]
     let appointmentTreatments: [AppointmentTreatment]
     let salonReminderAdjustments: [SalonReminderAdjustment]
+    let products: [BeautyProduct]
     @Binding var selectedTab: AppTab
     @Binding var selectedProductID: UUID?
     @Environment(\.modelContext) private var modelContext
@@ -198,6 +200,8 @@ private struct HomeView: View {
     @State private var pendingPreparation = false
     @State private var editingAppointment: BeautyAppointment?
     @State private var pendingAppointment: BeautyAppointment?
+    @State private var registeringProduct: BeautyProduct?
+    @State private var pendingProductRegistration: BeautyProduct?
     @State private var completingAppointment: BeautyAppointment?
     @State private var homeAlert: HomeAlert?
     @State private var editingDueAction: HomeAction?
@@ -227,6 +231,9 @@ private struct HomeView: View {
                 } else if let pendingAppointment {
                     self.pendingAppointment = nil
                     editingAppointment = pendingAppointment
+                } else if let pendingProductRegistration {
+                    self.pendingProductRegistration = nil
+                    registeringProduct = pendingProductRegistration
                 }
             }) {
                 allActionsSheet
@@ -250,6 +257,9 @@ private struct HomeView: View {
                     appointment: appointment,
                     treatments: appointmentTreatments.filter { $0.appointmentID == appointment.id }
                 )
+            }
+            .sheet(item: $registeringProduct) { product in
+                ProductUnitForm(product: product)
             }
             .alert(homeAlert?.title ?? "", isPresented: Binding(
                 get: { homeAlert != nil },
@@ -380,12 +390,19 @@ private struct HomeView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(Color(uiColor: .label))
 
-                if action.kind == .itemReplacement, let url = action.destinationURL {
-                    Button("もう一度購入", systemImage: "arrow.up.right") {
-                        openURL(url)
+                if action.kind == .itemReplacement {
+                    Button("買い直しを記録", systemImage: "plus") {
+                        registerReplacement(for: action)
                     }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    if let url = action.destinationURL {
+                        Button("もう一度購入", systemImage: "arrow.up.right") {
+                            openURL(url)
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    }
                 }
 
                 if action.kind == .salonNeedsBooking {
@@ -468,6 +485,16 @@ private struct HomeView: View {
                     }
                 } label: {
                     Label("予定の操作", systemImage: "ellipsis.circle")
+                }
+                .labelStyle(.iconOnly)
+                .frame(width: 44, height: 44)
+            } else if action.kind == .itemReplacement {
+                Menu {
+                    Button("買い直しを記録", systemImage: "plus") {
+                        registerReplacement(for: action)
+                    }
+                } label: {
+                    Label("買い替えの操作", systemImage: "ellipsis.circle")
                 }
                 .labelStyle(.iconOnly)
                 .frame(width: 44, height: 44)
@@ -604,6 +631,17 @@ private struct HomeView: View {
             showingAllActions = false
         } else {
             editingAppointment = appointment
+        }
+    }
+
+    private func registerReplacement(for action: HomeAction) {
+        guard let productID = action.productID,
+              let product = products.first(where: { $0.id == productID }) else { return }
+        if showingAllActions {
+            pendingProductRegistration = product
+            showingAllActions = false
+        } else {
+            registeringProduct = product
         }
     }
 
