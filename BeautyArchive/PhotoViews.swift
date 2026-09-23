@@ -3,14 +3,19 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct SalonPhotoDraft: Identifiable {
+struct PhotoDraft: Identifiable {
     let id = UUID()
     let data: Data
 }
 
-struct SalonPhotoEditor: View {
-    let existing: [SalonPhoto]
-    @Binding var newPhotos: [SalonPhotoDraft]
+struct StoredPhoto: Identifiable {
+    let id: UUID
+    let data: Data
+}
+
+struct PhotoEditor: View {
+    let existing: [StoredPhoto]
+    @Binding var newPhotos: [PhotoDraft]
     @Binding var removedPhotoIDs: Set<UUID>
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var isLoading = false
@@ -18,7 +23,7 @@ struct SalonPhotoEditor: View {
 
     private let maximumPhotoCount = 12
 
-    private var visibleExisting: [SalonPhoto] {
+    private var visibleExisting: [StoredPhoto] {
         existing.filter { !removedPhotoIDs.contains($0.id) }
     }
 
@@ -31,7 +36,7 @@ struct SalonPhotoEditor: View {
             ScrollView(.horizontal) {
                 HStack(spacing: 12) {
                     ForEach(visibleExisting) { photo in
-                        removableThumbnail(data: photo.imageData) {
+                        removableThumbnail(data: photo.data) {
                             removedPhotoIDs.insert(photo.id)
                         }
                     }
@@ -72,7 +77,7 @@ struct SalonPhotoEditor: View {
 
     private func removableThumbnail(data: Data, onRemove: @escaping () -> Void) -> some View {
         ZStack(alignment: .topTrailing) {
-            SalonPhotoImage(data: data)
+            PhotoImage(data: data)
                 .frame(width: 96, height: 96)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             Button(action: onRemove) {
@@ -98,12 +103,12 @@ struct SalonPhotoEditor: View {
             do {
                 guard let original = try await item.loadTransferable(type: Data.self),
                       let optimized = await Task.detached(priority: .userInitiated, operation: {
-                          SalonPhotoImageProcessor.optimizedJPEG(original)
+                          PhotoImageProcessor.optimizedJPEG(original)
                       }).value else {
                     failed = true
                     continue
                 }
-                newPhotos.append(SalonPhotoDraft(data: optimized))
+                newPhotos.append(PhotoDraft(data: optimized))
             } catch {
                 failed = true
             }
@@ -112,9 +117,9 @@ struct SalonPhotoEditor: View {
     }
 }
 
-struct SalonPhotoGallery: View {
-    let photos: [SalonPhoto]
-    @State private var selectedPhoto: SalonPhoto?
+struct PhotoGallery: View {
+    let photos: [StoredPhoto]
+    @State private var selectedPhoto: StoredPhoto?
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -123,7 +128,7 @@ struct SalonPhotoGallery: View {
                     Button {
                         selectedPhoto = photo
                     } label: {
-                        SalonPhotoImage(data: photo.imageData)
+                        PhotoImage(data: photo.data)
                             .frame(width: 120, height: 120)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
@@ -134,20 +139,20 @@ struct SalonPhotoGallery: View {
             .padding(.vertical, 4)
         }
         .fullScreenCover(item: $selectedPhoto) { photo in
-            SalonPhotoFullscreen(photo: photo)
+            PhotoFullscreen(photo: photo)
         }
     }
 }
 
-private struct SalonPhotoFullscreen: View {
-    let photo: SalonPhoto
+private struct PhotoFullscreen: View {
+    let photo: StoredPhoto
     @Environment(\.dismiss) private var dismiss
     @State private var zoom: CGFloat = 1
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Color.black.ignoresSafeArea()
-            if let image = UIImage(data: photo.imageData) {
+            if let image = UIImage(data: photo.data) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
@@ -156,7 +161,7 @@ private struct SalonPhotoFullscreen: View {
                     .gesture(MagnifyGesture().onChanged { value in
                         zoom = min(max(value.magnification, 1), 4)
                     })
-                    .accessibilityLabel("施術写真")
+                    .accessibilityLabel("写真")
             }
             Button("閉じる", systemImage: "xmark") { dismiss() }
                 .labelStyle(.iconOnly)
@@ -168,7 +173,7 @@ private struct SalonPhotoFullscreen: View {
     }
 }
 
-private struct SalonPhotoImage: View {
+private struct PhotoImage: View {
     let data: Data
 
     var body: some View {
@@ -187,7 +192,7 @@ private struct SalonPhotoImage: View {
     }
 }
 
-private enum SalonPhotoImageProcessor {
+private enum PhotoImageProcessor {
     nonisolated static func optimizedJPEG(_ data: Data) -> Data? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let thumbnailOptions: [CFString: Any] = [
