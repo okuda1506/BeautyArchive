@@ -4,7 +4,12 @@ import SwiftUI
 struct ProductUnitDetail: View {
     let unit: ProductUnit
     let product: BeautyProduct
+    @Query private var allUnits: [ProductUnit]
     @State private var showingEdit = false
+
+    private var replacementEstimate: ReplacementEstimate? {
+        ReplacementEstimate.calculate(for: unit, among: allUnits)
+    }
 
     var body: some View {
         List {
@@ -28,6 +33,13 @@ struct ProductUnitDetail: View {
                     if !unit.purchasedFrom.isEmpty {
                         LabeledContent("購入元", value: unit.purchasedFrom)
                     }
+                }
+            }
+            if let estimate = replacementEstimate {
+                Section("買い替え目安") {
+                    LabeledContent("日付", value: estimate.date.formatted(date: .abbreviated, time: .omitted))
+                    LabeledContent("使用日数", value: "\(estimate.usageDays)日")
+                    LabeledContent("根拠", value: estimate.source.title)
                 }
             }
             if !unit.note.isEmpty {
@@ -59,6 +71,9 @@ struct ProductUnitForm: View {
     @State private var priceText: String
     @State private var purchasedFrom: String
     @State private var note: String
+    @State private var usesReplacementEstimate: Bool
+    @State private var manualDaysText: String
+    @State private var adjustedDaysText: String
     @State private var errorMessage: String?
 
     init(product: BeautyProduct, unit: ProductUnit? = nil) {
@@ -73,6 +88,9 @@ struct ProductUnitForm: View {
         _priceText = State(initialValue: unit?.priceYen.map(String.init) ?? "")
         _purchasedFrom = State(initialValue: unit?.purchasedFrom ?? "")
         _note = State(initialValue: unit?.note ?? "")
+        _usesReplacementEstimate = State(initialValue: unit?.usesReplacementEstimate ?? false)
+        _manualDaysText = State(initialValue: unit?.manualUsageDays.map(String.init) ?? "")
+        _adjustedDaysText = State(initialValue: unit?.adjustedUsageDays.map(String.init) ?? "")
     }
 
     private var trimmedPrice: String {
@@ -81,12 +99,30 @@ struct ProductUnitForm: View {
 
     private var priceYen: Int? { Int(trimmedPrice) }
 
+    private var manualUsageDays: Int? {
+        Int(manualDaysText.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private var adjustedUsageDays: Int? {
+        let value = adjustedDaysText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : Int(value)
+    }
+
+    private var hasValidUsageDays: Bool {
+        !usesReplacementEstimate || (
+            manualUsageDays.map { (1...3650).contains($0) } == true
+                && (adjustedDaysText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    || adjustedUsageDays.map { (1...3650).contains($0) } == true)
+        )
+    }
+
     private var hasValidPrice: Bool {
         trimmedPrice.isEmpty || priceYen.map { $0 >= 0 } == true
     }
 
     private var isValid: Bool {
         hasValidPrice
+            && hasValidUsageDays
             && (status != .inUse || hasOpenedAt)
             && (status != .finished || !hasOpenedAt
                 || Calendar.current.startOfDay(for: finishedAt) >= Calendar.current.startOfDay(for: openedAt))
@@ -136,6 +172,23 @@ struct ProductUnitForm: View {
                     }
                     TextField("購入元", text: $purchasedFrom)
                 }
+                Section("買い替え目安") {
+                    Toggle("目安を表示", isOn: $usesReplacementEstimate)
+                    if usesReplacementEstimate {
+                        TextField("初回・履歴なしの使用日数", text: $manualDaysText)
+                            .keyboardType(.numberPad)
+                        TextField("調整する日数（任意）", text: $adjustedDaysText)
+                            .keyboardType(.numberPad)
+                        if !hasValidUsageDays {
+                            Text("使用日数は1〜3650日の整数で入力してください。")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                        Text("使用中で開封日がある1本に表示します。過去の有効な使い切り履歴があれば、その中央値を優先します。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Section("メモ（任意）") {
                     TextField("この1本についてのメモ", text: $note, axis: .vertical)
                 }
@@ -173,6 +226,9 @@ struct ProductUnitForm: View {
         target.priceYen = trimmedPrice.isEmpty ? nil : priceYen
         target.purchasedFrom = purchasedFrom.trimmingCharacters(in: .whitespacesAndNewlines)
         target.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        target.usesReplacementEstimate = usesReplacementEstimate
+        target.manualUsageDays = usesReplacementEstimate ? manualUsageDays : nil
+        target.adjustedUsageDays = usesReplacementEstimate ? adjustedUsageDays : nil
         target.updatedAt = .now
         if unit == nil { modelContext.insert(target) }
         do {

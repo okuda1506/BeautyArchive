@@ -30,6 +30,9 @@ final class ProductUnit {
     var purchasedFrom: String = ""
     var statusRaw: String = ProductUnitStatus.unopened.rawValue
     var note: String = ""
+    var usesReplacementEstimate: Bool = false
+    var manualUsageDays: Int? = nil
+    var adjustedUsageDays: Int? = nil
     var createdAt: Date = Date.now
     var updatedAt: Date = Date.now
 
@@ -43,6 +46,9 @@ final class ProductUnit {
         purchasedFrom: String = "",
         status: ProductUnitStatus = .unopened,
         note: String = "",
+        usesReplacementEstimate: Bool = false,
+        manualUsageDays: Int? = nil,
+        adjustedUsageDays: Int? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -55,6 +61,9 @@ final class ProductUnit {
         self.purchasedFrom = purchasedFrom
         self.statusRaw = status.rawValue
         self.note = note
+        self.usesReplacementEstimate = usesReplacementEstimate
+        self.manualUsageDays = manualUsageDays
+        self.adjustedUsageDays = adjustedUsageDays
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
