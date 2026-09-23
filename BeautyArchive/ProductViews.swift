@@ -4,6 +4,7 @@ import SwiftUI
 struct ProductListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \BeautyProduct.createdAt, order: .reverse) private var products: [BeautyProduct]
+    @Query private var units: [ProductUnit]
     @State private var showingAdd = false
     @State private var errorMessage: String?
 
@@ -64,7 +65,11 @@ struct ProductListView: View {
     }
 
     private func delete(_ offsets: IndexSet, from categoryProducts: [BeautyProduct]) {
-        for index in offsets { modelContext.delete(categoryProducts[index]) }
+        for index in offsets {
+            let product = categoryProducts[index]
+            for unit in units where unit.productID == product.id { modelContext.delete(unit) }
+            modelContext.delete(product)
+        }
         do { try modelContext.save() }
         catch {
             modelContext.rollback()
@@ -74,8 +79,16 @@ struct ProductListView: View {
 }
 
 private struct ProductDetail: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \ProductUnit.createdAt, order: .reverse) private var allUnits: [ProductUnit]
     let product: BeautyProduct
     @State private var showingEdit = false
+    @State private var showingAddUnit = false
+    @State private var errorMessage: String?
+
+    private var units: [ProductUnit] {
+        allUnits.filter { $0.productID == product.id }
+    }
 
     private var purchaseURL: URL? {
         guard let url = URL(string: product.purchaseURL),
@@ -91,6 +104,30 @@ private struct ProductDetail: View {
                 if !product.brand.isEmpty {
                     LabeledContent("ブランド", value: product.brand)
                 }
+            }
+            Section("購入・使用履歴") {
+                if units.isEmpty {
+                    Text("登録した1本はまだありません")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(units) { unit in
+                        NavigationLink {
+                            ProductUnitDetail(unit: unit, product: product)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(unit.status.title)
+                                    .font(.headline)
+                                if let purchasedAt = unit.purchasedAt {
+                                    Text(purchasedAt, format: .dateTime.year().month().day())
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .onDelete(perform: deleteUnits)
+                }
+                Button("もう1本登録", systemImage: "plus") { showingAddUnit = true }
             }
             if let url = purchaseURL {
                 Section("再購入") {
@@ -108,6 +145,24 @@ private struct ProductDetail: View {
             }
         }
         .sheet(isPresented: $showingEdit) { ProductForm(product: product) }
+        .sheet(isPresented: $showingAddUnit) { ProductUnitForm(product: product) }
+        .alert("削除できませんでした", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("閉じる", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private func deleteUnits(at offsets: IndexSet) {
+        for index in offsets { modelContext.delete(units[index]) }
+        do { try modelContext.save() }
+        catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
