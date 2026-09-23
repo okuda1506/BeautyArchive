@@ -1,36 +1,46 @@
 # Beauty Archive
 
-美容の記録と、次に行うことを一か所で管理するiOSアプリです。美容院での施術履歴や次回のオーダーを振り返り、化粧品・香水の買い替え時期や美容予定も管理できる体験を目指しています。
+[日本語](README.ja.md)
 
-## 現在の開発状況
+## Overview
 
-開発初期段階です。リポジトリにはSwiftUIのXcodeプロジェクトと、起動時に「Hello World!」を表示する画面が含まれています。以下の機能は今後実装する予定で、現時点では利用できません。仕様は開発中に変更される場合があります。
+Beauty Archive is an iOS app for keeping beauty records, schedules, and next actions together. Development is at an early stage; the current app is a SwiftUI starter screen, and the features below describe the planned initial release. Requirements may change as the project develops.
 
-## 初期リリースで目指す主な機能
+## Purpose
 
-- 美容院の施術履歴、担当者、写真、オーダーメモの記録
-- 次回の参考写真とオーダーを美容師に見せる画面
-- カット・カラーなど施術ごとの次回目安と通知
-- 化粧品・香水の管理と買い替え通知（初回は指定日数、以降は同一商品の使用履歴を活用）
-- 美容予定を表示する月間カレンダーと、任意のGoogle Calendar連携
-- iCloudによるデータ同期と、記録・写真の書き出し
+Help people recall their previous salon visits, prepare for the next appointment, and keep track of when to book a treatment or replace a product. The app is intended to connect these actions with existing booking and shopping services.
 
-初期リリースでは美容院での利用体験を優先します。メーカー表示の期限や開封後の使用期限の管理は対象外です。
+## App Highlights
 
-## 開発環境と起動方法
+- A salon-first experience centered on past treatments and the next visit.
+- A quick view of upcoming actions, appointments, and reminders.
+- Product replacement estimates that start with a user-defined interval and later use the same product's usage history.
+- Local-first data storage, with iCloud sync planned for supported devices.
 
-- macOSとXcode
-- iOS 26.5以降のシミュレータまたは対応端末（現在のXcodeプロジェクト設定）
+## Features
 
-`BeautyArchive.xcodeproj`をXcodeで開き、`BeautyArchive`スキームを選択して実行してください。現時点のコードはSwiftとSwiftUIで構成されています。SwiftData、CloudKit、通知、Google Calendar連携などは実装予定の技術です。
+The planned initial release includes:
 
-## リポジトリ構成
+- Salon visit records with treatments, staff, photos, and notes; reference photos and an order summary to show a stylist.
+- Separate timing and reminders for treatments such as cuts and coloring, plus links to external booking services.
+- Cosmetics and fragrance records, including individual purchased items, usage history, replacement reminders, and repurchase links.
+- An in-app monthly calendar for beauty appointments, with optional Google Calendar integration.
+- Export of records and photos.
 
-```text
-BeautyArchive/            アプリ本体
-BeautyArchive.xcodeproj/  Xcodeプロジェクト
-BeautyArchiveTests/       ユニットテスト
-BeautyArchiveUITests/     UIテスト
-```
+These features are not implemented yet. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
 
-仕様とデザインは検討・更新中です。実装前に最新の仕様を確認してください。
+## Tech Stack
+
+- **Currently in the project:** Swift, SwiftUI, Xcode, and XCTest targets.
+- **Planned:** SwiftData, CloudKit, UserNotifications, PhotosPicker, Google OAuth, and the Google Calendar API.
+
+The planned architecture is local-first, without a dedicated app backend for the initial release.
+
+## Local Setup
+
+1. Install Xcode on macOS and make an iOS 26.5 or later simulator available. The Xcode project currently sets iOS 26.5 as its deployment target.
+2. Clone this private repository: `git clone https://github.com/okuda1506/BeautyArchive.git` (GitHub access is required).
+3. Open `BeautyArchive.xcodeproj` in Xcode.
+4. Select the `BeautyArchive` scheme and an available simulator, then run the app.
+
+The current app displays a starter screen. Google Calendar credentials and other integrations are not required to run it at this stage.
