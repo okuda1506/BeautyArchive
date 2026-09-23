@@ -16,6 +16,8 @@ struct ContentView: View {
     @Query private var photos: [SalonPhoto]
     @Query private var appointments: [BeautyAppointment]
     @Query private var appointmentTreatments: [AppointmentTreatment]
+    @Query private var products: [BeautyProduct]
+    @Query private var productUnits: [ProductUnit]
     @State private var selectedTab: AppTab = .home
 
     init(actions: [HomeAction]? = nil) {
@@ -23,13 +25,16 @@ struct ContentView: View {
     }
 
     private var actions: [HomeAction] {
-        previewActions ?? SalonMaintenance.actions(
+        if let previewActions { return previewActions }
+        let salonActions = SalonMaintenance.actions(
             visits: visits,
             treatments: treatments,
             photos: photos,
             appointments: appointments,
             appointmentTreatments: appointmentTreatments
         )
+        let replacementActions = ProductReplacementActions.actions(products: products, units: productUnits)
+        return (salonActions + replacementActions).sorted { $0.date < $1.date }
     }
 
     var body: some View {
@@ -434,7 +439,8 @@ private struct HomeView: View {
         .modelContainer(for: [
             SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
             HairStyleReference.self, ReferencePhoto.self,
-            BeautyAppointment.self, AppointmentTreatment.self
+            BeautyAppointment.self, AppointmentTreatment.self,
+            BeautyProduct.self, ProductUnit.self
         ], inMemory: true)
 }
 
@@ -464,6 +470,7 @@ private struct HomeView: View {
     .modelContainer(for: [
         SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
         HairStyleReference.self, ReferencePhoto.self,
-        BeautyAppointment.self, AppointmentTreatment.self
+        BeautyAppointment.self, AppointmentTreatment.self,
+        BeautyProduct.self, ProductUnit.self
     ], inMemory: true)
 }
