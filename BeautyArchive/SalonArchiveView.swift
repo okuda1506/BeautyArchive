@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct SalonArchiveView: View {
+    @Binding var selectedVisitID: UUID?
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \SalonVisit.date, order: .reverse) private var visits: [SalonVisit]
     @Query private var treatments: [SalonTreatment]
@@ -10,9 +11,10 @@ struct SalonArchiveView: View {
     @State private var showingAdd = false
     @State private var copyingFrom: SalonVisit?
     @State private var errorMessage: String?
+    @State private var path: [UUID] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if visits.isEmpty {
                     ContentUnavailableView(
@@ -23,9 +25,7 @@ struct SalonArchiveView: View {
                 } else {
                     List {
                         ForEach(visits) { visit in
-                            NavigationLink {
-                                SalonVisitDetail(visit: visit)
-                            } label: {
+                            NavigationLink(value: visit.id) {
                                 HStack(spacing: 12) {
                                     if let data = firstPhoto(for: visit)?.imageData,
                                        let image = UIImage(data: data) {
@@ -65,6 +65,13 @@ struct SalonArchiveView: View {
                 }
             }
             .navigationTitle("記録")
+            .navigationDestination(for: UUID.self) { visitID in
+                if let visit = visits.first(where: { $0.id == visitID }) {
+                    SalonVisitDetail(visit: visit)
+                } else {
+                    ContentUnavailableView("記録が見つかりません", systemImage: "scissors")
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     NavigationLink {
@@ -109,7 +116,17 @@ struct SalonArchiveView: View {
             } message: {
                 Text(errorMessage ?? "")
             }
+            .onAppear { openSelectedVisit() }
+            .onChange(of: selectedVisitID) { _, _ in openSelectedVisit() }
+            .onChange(of: visits.map(\.id)) { _, _ in openSelectedVisit() }
         }
+    }
+
+    private func openSelectedVisit() {
+        guard let selectedVisitID,
+              visits.contains(where: { $0.id == selectedVisitID }) else { return }
+        path = [selectedVisitID]
+        self.selectedVisitID = nil
     }
 
     private func treatmentNames(for visit: SalonVisit) -> String {
