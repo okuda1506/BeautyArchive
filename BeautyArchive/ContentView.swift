@@ -13,6 +13,7 @@ struct ContentView: View {
     private let previewActions: [HomeAction]?
     @Query private var visits: [SalonVisit]
     @Query private var treatments: [SalonTreatment]
+    @Query private var photos: [SalonPhoto]
     @State private var selectedTab: AppTab = .home
 
     init(actions: [HomeAction]? = nil) {
@@ -20,7 +21,9 @@ struct ContentView: View {
     }
 
     private var actions: [HomeAction] {
-        previewActions ?? SalonMaintenance.actions(visits: visits, treatments: treatments)
+        previewActions ?? SalonMaintenance.actions(
+            visits: visits, treatments: treatments, photos: photos
+        )
     }
 
     var body: some View {
@@ -188,8 +191,8 @@ private struct HomeView: View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
                 Group {
-                    if let imageName = action.imageName {
-                        Image(imageName)
+                    if let photo = actionPhoto(for: action) {
+                        photo
                             .resizable()
                             .scaledToFill()
                             .frame(width: geometry.size.width, height: geometry.size.height)
@@ -255,8 +258,8 @@ private struct HomeView: View {
             handle(action)
         } label: {
             HStack(spacing: 14) {
-                if let imageName = action.imageName {
-                    Image(imageName)
+                if let photo = actionPhoto(for: action) {
+                    photo
                         .resizable()
                         .scaledToFill()
                         .frame(width: 64, height: 64)
@@ -327,6 +330,14 @@ private struct HomeView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(title)を開く")
+    }
+
+    private func actionPhoto(for action: HomeAction) -> Image? {
+        if let data = action.imageData, let image = UIImage(data: data) {
+            return Image(uiImage: image)
+        }
+        if let imageName = action.imageName { return Image(imageName) }
+        return nil
     }
 
     private var allActionsSheet: some View {

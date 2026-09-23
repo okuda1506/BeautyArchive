@@ -97,9 +97,14 @@ enum SalonMaintenance {
     static func actions(
         visits: [SalonVisit],
         treatments: [SalonTreatment],
+        photos: [SalonPhoto] = [],
         calendar: Calendar = .current
     ) -> [HomeAction] {
-        latestByName(visits: visits, treatments: treatments).values.compactMap { pair in
+        let firstPhotoByVisit = Dictionary(grouping: photos, by: \.visitID)
+            .compactMapValues { group in
+                group.min { $0.sortOrder < $1.sortOrder }?.imageData
+            }
+        return latestByName(visits: visits, treatments: treatments).values.compactMap { pair in
             let visit = pair.visit
             let treatment = pair.treatment
             guard let dueDate = calendar.date(
@@ -115,6 +120,7 @@ enum SalonMaintenance {
                 kind: .salonNeedsBooking,
                 title: treatment.name,
                 date: dueDate,
+                imageData: firstPhotoByVisit[visit.id],
                 detail: visit.salonName.isEmpty ? nil : visit.salonName,
                 destinationURL: bookingURL
             )

@@ -12,6 +12,7 @@ struct HomeAction: Identifiable {
     let title: String
     let date: Date
     let imageName: String?
+    let imageData: Data?
     let detail: String?
     let destinationURL: URL?
 
@@ -21,6 +22,7 @@ struct HomeAction: Identifiable {
         title: String,
         date: Date,
         imageName: String? = nil,
+        imageData: Data? = nil,
         detail: String? = nil,
         destinationURL: URL? = nil
     ) {
@@ -29,6 +31,7 @@ struct HomeAction: Identifiable {
         self.title = title
         self.date = date
         self.imageName = imageName
+        self.imageData = imageData
         self.detail = detail
         self.destinationURL = destinationURL
     }

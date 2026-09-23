@@ -25,16 +25,35 @@ struct SalonArchiveView: View {
                             NavigationLink {
                                 SalonVisitDetail(visit: visit)
                             } label: {
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text(visit.date, format: .dateTime.year().month().day())
-                                        .font(.headline)
-                                    Text(treatmentNames(for: visit))
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                    if !visit.salonName.isEmpty {
-                                        Text(visit.salonName)
-                                            .font(.caption)
+                                HStack(spacing: 12) {
+                                    if let data = firstPhoto(for: visit)?.imageData,
+                                       let image = UIImage(data: data) {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 60, height: 60)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                            .accessibilityHidden(true)
+                                    } else {
+                                        Image(systemName: "scissors")
+                                            .font(.title3)
                                             .foregroundStyle(.secondary)
+                                            .frame(width: 60, height: 60)
+                                            .background(Color(uiColor: .tertiarySystemGroupedBackground))
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                            .accessibilityHidden(true)
+                                    }
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text(visit.date, format: .dateTime.year().month().day())
+                                            .font(.headline)
+                                        Text(treatmentNames(for: visit))
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                        if !visit.salonName.isEmpty {
+                                            Text(visit.salonName)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
                                     }
                                 }
                                 .padding(.vertical, 4)
@@ -86,6 +105,10 @@ struct SalonArchiveView: View {
 
     private func treatmentNames(for visit: SalonVisit) -> String {
         treatments.filter { $0.visitID == visit.id }.map(\.name).joined(separator: "・")
+    }
+
+    private func firstPhoto(for visit: SalonVisit) -> SalonPhoto? {
+        photos.filter { $0.visitID == visit.id }.min { $0.sortOrder < $1.sortOrder }
     }
 
     private func delete(at offsets: IndexSet) {
