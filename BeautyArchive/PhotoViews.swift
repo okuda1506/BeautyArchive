@@ -119,7 +119,13 @@ struct PhotoEditor: View {
 
 struct PhotoGallery: View {
     let photos: [StoredPhoto]
+    let thumbnailSize: CGFloat
     @State private var selectedPhoto: StoredPhoto?
+
+    init(photos: [StoredPhoto], thumbnailSize: CGFloat = 120) {
+        self.photos = photos
+        self.thumbnailSize = thumbnailSize
+    }
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -129,7 +135,7 @@ struct PhotoGallery: View {
                         selectedPhoto = photo
                     } label: {
                         PhotoImage(data: photo.data)
-                            .frame(width: 120, height: 120)
+                            .frame(width: thumbnailSize, height: thumbnailSize)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     .buttonStyle(.plain)
