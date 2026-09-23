@@ -50,7 +50,19 @@ struct ContentView: View {
         let productChanges = products.map {
             "\($0.id.uuidString):\($0.updatedAt.timeIntervalSince1970)"
         }.sorted().joined(separator: "|")
-        return "\(remindersEnabled):\(leadChoice):\(customLeadDays):\(unitChanges):\(productChanges)"
+        let visitChanges = visits.map {
+            "\($0.id.uuidString):\($0.date.timeIntervalSince1970)"
+        }.sorted().joined(separator: "|")
+        let treatmentChanges = treatments.map {
+            "\($0.id.uuidString):\($0.visitID.uuidString):\($0.name):\($0.cycleDays)"
+        }.sorted().joined(separator: "|")
+        let appointmentChanges = appointments.map {
+            "\($0.id.uuidString):\($0.startAt.timeIntervalSince1970):\($0.statusRaw):\($0.completedVisitID?.uuidString ?? "")"
+        }.sorted().joined(separator: "|")
+        let appointmentTreatmentChanges = appointmentTreatments.map {
+            "\($0.id.uuidString):\($0.appointmentID.uuidString):\($0.name)"
+        }.sorted().joined(separator: "|")
+        return "\(remindersEnabled):\(leadChoice):\(customLeadDays):\(unitChanges):\(productChanges):\(visitChanges):\(treatmentChanges):\(appointmentChanges):\(appointmentTreatmentChanges)"
     }
 
     var body: some View {
@@ -118,16 +130,26 @@ struct ContentView: View {
         previousTask?.cancel()
         notificationTask = Task {
             await previousTask?.value
-            let error = await ProductNotificationScheduler.reconcile(
+            let leadDays = ReminderPreferences.effectiveLeadDays(
+                choice: leadChoice, customDays: customLeadDays
+            )
+            let productError = await ProductNotificationScheduler.reconcile(
                 products: products,
                 units: productUnits,
                 enabled: remindersEnabled,
-                leadDays: ReminderPreferences.effectiveLeadDays(
-                    choice: leadChoice, customDays: customLeadDays
-                )
+                leadDays: leadDays
             )
             guard !Task.isCancelled else { return }
-            if let error { notificationError = error }
+            let salonError = await SalonNotificationScheduler.reconcile(
+                visits: visits,
+                treatments: treatments,
+                appointments: appointments,
+                appointmentTreatments: appointmentTreatments,
+                enabled: remindersEnabled,
+                leadDays: leadDays
+            )
+            guard !Task.isCancelled else { return }
+            if let error = productError ?? salonError { notificationError = error }
         }
     }
 }
