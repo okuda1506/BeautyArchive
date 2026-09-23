@@ -206,8 +206,10 @@ private struct HomeView: View {
     @State private var registeringProduct: BeautyProduct?
     @State private var pendingProductRegistration: BeautyProduct?
     @State private var completingAppointment: BeautyAppointment?
+    @State private var pendingVisitAppointment: BeautyAppointment?
     @State private var homeAlert: HomeAlert?
     @State private var editingDueAction: HomeAction?
+    @State private var pendingDueAction: HomeAction?
     @State private var editedDueDate = Date.now
 
     private var upcoming: [HomeAction] { HomeAction.upcoming(from: actions) }
@@ -237,6 +239,13 @@ private struct HomeView: View {
                 } else if let pendingProductRegistration {
                     self.pendingProductRegistration = nil
                     registeringProduct = pendingProductRegistration
+                } else if let pendingVisitAppointment {
+                    self.pendingVisitAppointment = nil
+                    completingAppointment = pendingVisitAppointment
+                    showingAddVisit = true
+                } else if let pendingDueAction {
+                    self.pendingDueAction = nil
+                    editingDueAction = pendingDueAction
                 }
             }) {
                 allActionsSheet
@@ -625,8 +634,13 @@ private struct HomeView: View {
             if wasShowingAllActions { pendingPreparation = true }
             else { showingPreparation = true }
         case .salonNeedsRecord:
-            completingAppointment = appointments.first { $0.id == action.id }
-            showingAddVisit = true
+            guard let appointment = appointments.first(where: { $0.id == action.id }) else { return }
+            if wasShowingAllActions {
+                pendingVisitAppointment = appointment
+            } else {
+                completingAppointment = appointment
+                showingAddVisit = true
+            }
         case .itemReplacement:
             selectedProductID = action.productID
             selectedTab = .items
@@ -664,11 +678,7 @@ private struct HomeView: View {
                 Text("通知は設定でオンにできます")
             }
             Button("今回の目安日を変更", systemImage: "calendar.badge.clock") {
-                let tomorrow = calendar.date(
-                    byAdding: .day, value: 1, to: calendar.startOfDay(for: .now)
-                ) ?? .now
-                editedDueDate = max(action.date, tomorrow)
-                editingDueAction = action
+                editDueDate(for: action)
             }
             if activeAdjustment(for: action) != nil {
                 Button("調整を解除", systemImage: "arrow.uturn.backward", role: .destructive) {
@@ -679,6 +689,19 @@ private struct HomeView: View {
             Label("今回は見送る", systemImage: "ellipsis.circle")
         }
         .accessibilityLabel("\(action.title)の通知・目安を調整")
+    }
+
+    private func editDueDate(for action: HomeAction) {
+        let tomorrow = calendar.date(
+            byAdding: .day, value: 1, to: calendar.startOfDay(for: .now)
+        ) ?? .now
+        editedDueDate = max(action.date, tomorrow)
+        if showingAllActions {
+            pendingDueAction = action
+            showingAllActions = false
+        } else {
+            editingDueAction = action
+        }
     }
 
     private func dueDateEditor(for action: HomeAction) -> some View {
