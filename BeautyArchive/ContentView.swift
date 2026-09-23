@@ -194,6 +194,8 @@ private struct HomeView: View {
     @Environment(\.openURL) private var openURL
     @State private var showingAllActions = false
     @State private var showingAddVisit = false
+    @State private var showingPreparation = false
+    @State private var pendingPreparation = false
     @State private var completingAppointment: BeautyAppointment?
     @State private var homeAlert: HomeAlert?
     @State private var editingDueAction: HomeAction?
@@ -216,7 +218,12 @@ private struct HomeView: View {
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingAllActions) {
+            .sheet(isPresented: $showingAllActions, onDismiss: {
+                if pendingPreparation {
+                    pendingPreparation = false
+                    showingPreparation = true
+                }
+            }) {
                 allActionsSheet
             }
             .sheet(isPresented: $showingAddVisit) {
@@ -229,6 +236,9 @@ private struct HomeView: View {
             }
             .sheet(item: $editingDueAction) { action in
                 dueDateEditor(for: action)
+            }
+            .sheet(isPresented: $showingPreparation) {
+                StylistPreparationPicker()
             }
             .alert(homeAlert?.title ?? "", isPresented: Binding(
                 get: { homeAlert != nil },
@@ -541,13 +551,15 @@ private struct HomeView: View {
     }
 
     private func handle(_ action: HomeAction) {
+        let wasShowingAllActions = showingAllActions
         showingAllActions = false
         switch action.kind {
         case .salonNeedsBooking:
             if let url = action.destinationURL { openURL(url) }
             else { homeAlert = .missingBookingURL }
         case .salonBooked:
-            selectedTab = .archive
+            if wasShowingAllActions { pendingPreparation = true }
+            else { showingPreparation = true }
         case .salonNeedsRecord:
             completingAppointment = appointments.first { $0.id == action.id }
             showingAddVisit = true
