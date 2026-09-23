@@ -17,6 +17,9 @@ struct HomeAction: Identifiable {
     let detail: String?
     let productID: UUID?
     let destinationURL: URL?
+    let baselineDate: Date?
+    let snoozedReminderDate: Date?
+    let hasDueDateOverride: Bool
 
     init(
         id: UUID = UUID(),
@@ -27,7 +30,10 @@ struct HomeAction: Identifiable {
         imageData: Data? = nil,
         detail: String? = nil,
         productID: UUID? = nil,
-        destinationURL: URL? = nil
+        destinationURL: URL? = nil,
+        baselineDate: Date? = nil,
+        snoozedReminderDate: Date? = nil,
+        hasDueDateOverride: Bool = false
     ) {
         self.id = id
         self.kind = kind
@@ -38,6 +44,9 @@ struct HomeAction: Identifiable {
         self.detail = detail
         self.productID = productID
         self.destinationURL = destinationURL
+        self.baselineDate = baselineDate
+        self.snoozedReminderDate = snoozedReminderDate
+        self.hasDueDateOverride = hasDueDateOverride
     }
 
     static func upcoming(from actions: [HomeAction], limit: Int = 3) -> [HomeAction] {

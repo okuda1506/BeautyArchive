@@ -104,6 +104,7 @@ enum SalonMaintenance {
         photos: [SalonPhoto] = [],
         appointments: [BeautyAppointment] = [],
         appointmentTreatments: [AppointmentTreatment] = [],
+        reminderAdjustments: [SalonReminderAdjustment] = [],
         referenceDate: Date = .now,
         calendar: Calendar = .current
     ) -> [HomeAction] {
@@ -113,6 +114,7 @@ enum SalonMaintenance {
                 group.min { $0.sortOrder < $1.sortOrder }?.imageData
             }
         let namesByAppointment = Dictionary(grouping: appointmentTreatments, by: \.appointmentID)
+        let adjustmentsByTreatment = Dictionary(grouping: reminderAdjustments, by: \.treatmentID)
         var reservedNames: Set<String> = []
         let appointmentActions: [HomeAction] = appointments.compactMap { appointment in
             guard !appointment.isCancelled else { return nil }
@@ -143,6 +145,10 @@ enum SalonMaintenance {
                 value: max(1, treatment.cycleDays),
                 to: calendar.startOfDay(for: visit.date)
             ) else { return nil }
+            let adjustment = adjustmentsByTreatment[treatment.id]?
+                .filter { calendar.isDate($0.baseDueDate, inSameDayAs: dueDate) }
+                .max { $0.updatedAt < $1.updatedAt }
+            let adjustedDate = adjustment?.overrideDueDate ?? dueDate
             let components = URLComponents(string: visit.bookingURL)
             let bookingURL: URL? = ["https", "http"].contains(components?.scheme?.lowercased() ?? "")
                 ? components?.url : nil
@@ -150,10 +156,13 @@ enum SalonMaintenance {
                 id: treatment.id,
                 kind: .salonNeedsBooking,
                 title: treatment.name,
-                date: dueDate,
+                date: adjustedDate,
                 imageData: firstPhotoByVisit[visit.id],
                 detail: visit.salonName.isEmpty ? nil : visit.salonName,
-                destinationURL: bookingURL
+                destinationURL: bookingURL,
+                baselineDate: dueDate,
+                snoozedReminderDate: adjustment?.snoozedUntil,
+                hasDueDateOverride: adjustment?.overrideDueDate != nil
             )
         }
         return (appointmentActions + dueActions).sorted { $0.date < $1.date }

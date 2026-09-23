@@ -18,7 +18,8 @@ struct BeautyArchiveApp: App {
             SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
             HairStyleReference.self, ReferencePhoto.self,
             BeautyAppointment.self, AppointmentTreatment.self,
-            BeautyProduct.self, ProductUnit.self
+            BeautyProduct.self, ProductUnit.self,
+            SalonReminderAdjustment.self
         ])
     }
 }
