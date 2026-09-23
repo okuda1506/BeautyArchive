@@ -20,6 +20,7 @@ struct ContentView: View {
     @Query private var photos: [SalonPhoto]
     @Query private var appointments: [BeautyAppointment]
     @Query private var appointmentTreatments: [AppointmentTreatment]
+    @Query private var salonReminderAdjustments: [SalonReminderAdjustment]
     @Query private var products: [BeautyProduct]
     @Query private var productUnits: [ProductUnit]
     @State private var selectedTab: AppTab = .home
@@ -38,7 +39,8 @@ struct ContentView: View {
             treatments: treatments,
             photos: photos,
             appointments: appointments,
-            appointmentTreatments: appointmentTreatments
+            appointmentTreatments: appointmentTreatments,
+            reminderAdjustments: salonReminderAdjustments
         )
         let replacementActions = ProductReplacementActions.actions(products: products, units: productUnits)
         return (salonActions + replacementActions).sorted { $0.date < $1.date }
@@ -63,7 +65,10 @@ struct ContentView: View {
         let appointmentTreatmentChanges = appointmentTreatments.map {
             "\($0.id.uuidString):\($0.appointmentID.uuidString):\($0.name)"
         }.sorted().joined(separator: "|")
-        return "\(remindersEnabled):\(leadChoice):\(customLeadDays):\(unitChanges):\(productChanges):\(visitChanges):\(treatmentChanges):\(appointmentChanges):\(appointmentTreatmentChanges)"
+        let adjustmentChanges = salonReminderAdjustments.map {
+            "\($0.id.uuidString):\($0.updatedAt.timeIntervalSince1970):\($0.baseDueDate.timeIntervalSince1970):\($0.overrideDueDate?.timeIntervalSince1970 ?? 0):\($0.snoozedUntil?.timeIntervalSince1970 ?? 0)"
+        }.sorted().joined(separator: "|")
+        return "\(remindersEnabled):\(leadChoice):\(customLeadDays):\(unitChanges):\(productChanges):\(visitChanges):\(treatmentChanges):\(appointmentChanges):\(appointmentTreatmentChanges):\(adjustmentChanges)"
     }
 
     var body: some View {
@@ -73,6 +78,7 @@ struct ContentView: View {
                     actions: actions,
                     appointments: appointments,
                     appointmentTreatments: appointmentTreatments,
+                    salonReminderAdjustments: salonReminderAdjustments,
                     selectedTab: $selectedTab,
                     selectedProductID: $selectedProductID
                 )
@@ -147,6 +153,7 @@ struct ContentView: View {
                 treatments: treatments,
                 appointments: appointments,
                 appointmentTreatments: appointmentTreatments,
+                reminderAdjustments: salonReminderAdjustments,
                 enabled: remindersEnabled,
                 leadDays: leadDays
             )
@@ -157,16 +164,22 @@ struct ContentView: View {
 }
 
 private struct HomeView: View {
+    @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
     let actions: [HomeAction]
     let appointments: [BeautyAppointment]
     let appointmentTreatments: [AppointmentTreatment]
+    let salonReminderAdjustments: [SalonReminderAdjustment]
     @Binding var selectedTab: AppTab
     @Binding var selectedProductID: UUID?
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @State private var showingAllActions = false
     @State private var showingAddVisit = false
     @State private var completingAppointment: BeautyAppointment?
     @State private var showingLinkNotice = false
+    @State private var editingDueAction: HomeAction?
+    @State private var editedDueDate = Date.now
+    @State private var adjustmentError: String?
 
     private var upcoming: [HomeAction] { HomeAction.upcoming(from: actions) }
     private var calendar: Calendar { .current }
@@ -196,10 +209,21 @@ private struct HomeView: View {
                     }
                 )
             }
+            .sheet(item: $editingDueAction) { action in
+                dueDateEditor(for: action)
+            }
             .alert("予約先が未登録です", isPresented: $showingLinkNotice) {
                 Button("閉じる", role: .cancel) { }
             } message: {
                 Text("記録に予約先のURLを登録すると、ここから開けるようになります。")
+            }
+            .alert("目安を変更できませんでした", isPresented: Binding(
+                get: { adjustmentError != nil },
+                set: { if !$0 { adjustmentError = nil } }
+            )) {
+                Button("閉じる", role: .cancel) { adjustmentError = nil }
+            } message: {
+                Text(adjustmentError ?? "")
             }
         }
     }
@@ -336,6 +360,10 @@ private struct HomeView: View {
                     }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    if action.baselineDate != nil {
+                        adjustmentMenu(for: action)
+                            .font(.subheadline)
+                    }
                 }
             }
             .padding(18)
@@ -345,47 +373,55 @@ private struct HomeView: View {
     }
 
     private func compactAction(_ action: HomeAction) -> some View {
-        Button {
-            handle(action)
-        } label: {
-            HStack(spacing: 14) {
-                if let photo = actionPhoto(for: action) {
-                    photo
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 64, height: 64)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    Image(systemName: action.kind == .itemReplacement ? "bag" : "scissors")
-                        .font(.title2)
-                        .frame(width: 64, height: 64)
-                        .background(Color(uiColor: .secondarySystemGroupedBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(action.title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text(dateSummary(for: action))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    if let detail = action.detail {
-                        Text(detail)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+        HStack(spacing: 0) {
+            Button {
+                handle(action)
+            } label: {
+                HStack(spacing: 14) {
+                    if let photo = actionPhoto(for: action) {
+                        photo
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 64, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } else {
+                        Image(systemName: action.kind == .itemReplacement ? "bag" : "scissors")
+                            .font(.title2)
+                            .frame(width: 64, height: 64)
+                            .background(Color(uiColor: .secondarySystemGroupedBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(action.title)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        Text(dateSummary(for: action))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        if let detail = action.detail {
+                            Text(detail)
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.bold())
+                        .foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
+                .frame(minHeight: 72)
+                .contentShape(Rectangle())
             }
-            .frame(minHeight: 72)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(action.title)、\(dateSummary(for: action))、\(actionTitle(for: action))")
+
+            if action.kind == .salonNeedsBooking, action.baselineDate != nil {
+                adjustmentMenu(for: action)
+                    .labelStyle(.iconOnly)
+                    .frame(width: 44, height: 44)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(action.title)、\(dateSummary(for: action))、\(actionTitle(for: action))")
     }
 
     private var categorySection: some View {
@@ -450,7 +486,15 @@ private struct HomeView: View {
             .dateTime.month().day().locale(Locale(identifier: "ja_JP"))
         )
         switch action.kind {
-        case .salonNeedsBooking: return "次回目安 \(dateText)"
+        case .salonNeedsBooking:
+            let label = action.hasDueDateOverride ? "今回の目安" : "次回目安"
+            if remindersEnabled, let reminderDate = action.snoozedReminderDate {
+                let reminderText = reminderDate.formatted(
+                    .dateTime.month().day().locale(Locale(identifier: "ja_JP"))
+                )
+                return "\(label) \(dateText) · \(reminderText)に再通知"
+            }
+            return "\(label) \(dateText)"
         case .salonBooked:
             return "予約済み · \(action.date.formatted(.dateTime.month().day().hour().minute()))"
         case .salonNeedsRecord: return "予約日時を経過 · \(dateText)"
@@ -499,6 +543,116 @@ private struct HomeView: View {
             selectedTab = .items
         }
     }
+
+    private func adjustmentMenu(for action: HomeAction) -> some View {
+        Menu {
+            Button("1週間後に知らせる", systemImage: "clock.arrow.circlepath") {
+                postponeReminder(for: action)
+            }
+            .disabled(!remindersEnabled)
+            if !remindersEnabled {
+                Text("通知は設定でオンにできます")
+            }
+            Button("今回の目安日を変更", systemImage: "calendar.badge.clock") {
+                let tomorrow = calendar.date(
+                    byAdding: .day, value: 1, to: calendar.startOfDay(for: .now)
+                ) ?? .now
+                editedDueDate = max(action.date, tomorrow)
+                editingDueAction = action
+            }
+            if activeAdjustment(for: action) != nil {
+                Button("調整を解除", systemImage: "arrow.uturn.backward", role: .destructive) {
+                    clearAdjustment(for: action)
+                }
+            }
+        } label: {
+            Label("今回は見送る", systemImage: "ellipsis.circle")
+        }
+        .accessibilityLabel("\(action.title)の通知・目安を調整")
+    }
+
+    private func dueDateEditor(for action: HomeAction) -> some View {
+        let tomorrow = calendar.date(
+            byAdding: .day, value: 1, to: calendar.startOfDay(for: .now)
+        ) ?? .now
+        return NavigationStack {
+            Form {
+                DatePicker("今回の次回目安", selection: $editedDueDate,
+                           in: tomorrow..., displayedComponents: .date)
+                Text("今回の目安日だけを変更します。施術履歴と通常の周期は変わりません。")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .navigationTitle("次回目安を変更")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("キャンセル") { editingDueAction = nil }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        updateAdjustment(for: action) { adjustment in
+                            adjustment.overrideDueDate = calendar.startOfDay(for: editedDueDate)
+                            adjustment.snoozedUntil = nil
+                        }
+                        editingDueAction = nil
+                    }
+                }
+            }
+        }
+    }
+
+    private func activeAdjustment(for action: HomeAction) -> SalonReminderAdjustment? {
+        guard let baselineDate = action.baselineDate else { return nil }
+        return salonReminderAdjustments
+            .filter {
+                $0.treatmentID == action.id
+                    && calendar.isDate($0.baseDueDate, inSameDayAs: baselineDate)
+            }
+            .max { $0.updatedAt < $1.updatedAt }
+    }
+
+    private func postponeReminder(for action: HomeAction) {
+        let nextWeek = calendar.date(
+            byAdding: .day, value: 7, to: calendar.startOfDay(for: .now)
+        ) ?? .now
+        updateAdjustment(for: action) { $0.snoozedUntil = nextWeek }
+    }
+
+    private func updateAdjustment(
+        for action: HomeAction,
+        change: (SalonReminderAdjustment) -> Void
+    ) {
+        guard let baselineDate = action.baselineDate else { return }
+        adjustmentError = nil
+        let existing = salonReminderAdjustments.first { $0.treatmentID == action.id }
+        let adjustment = existing ?? SalonReminderAdjustment(
+            treatmentID: action.id, baseDueDate: baselineDate
+        )
+        if existing == nil { modelContext.insert(adjustment) }
+        if !calendar.isDate(adjustment.baseDueDate, inSameDayAs: baselineDate) {
+            adjustment.baseDueDate = baselineDate
+            adjustment.overrideDueDate = nil
+            adjustment.snoozedUntil = nil
+        }
+        change(adjustment)
+        adjustment.updatedAt = .now
+        do { try modelContext.save() }
+        catch {
+            modelContext.rollback()
+            adjustmentError = error.localizedDescription
+        }
+    }
+
+    private func clearAdjustment(for action: HomeAction) {
+        guard let adjustment = activeAdjustment(for: action) else { return }
+        modelContext.delete(adjustment)
+        do { try modelContext.save() }
+        catch {
+            modelContext.rollback()
+            adjustmentError = error.localizedDescription
+        }
+    }
 }
 
 #Preview("Empty") {
@@ -507,7 +661,8 @@ private struct HomeView: View {
             SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
             HairStyleReference.self, ReferencePhoto.self,
             BeautyAppointment.self, AppointmentTreatment.self,
-            BeautyProduct.self, ProductUnit.self
+            BeautyProduct.self, ProductUnit.self,
+            SalonReminderAdjustment.self
         ], inMemory: true)
 }
 
@@ -538,6 +693,7 @@ private struct HomeView: View {
         SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
         HairStyleReference.self, ReferencePhoto.self,
         BeautyAppointment.self, AppointmentTreatment.self,
-        BeautyProduct.self, ProductUnit.self
+        BeautyProduct.self, ProductUnit.self,
+        SalonReminderAdjustment.self
     ], inMemory: true)
 }

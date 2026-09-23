@@ -9,6 +9,7 @@ enum SalonNotificationScheduler {
         treatments: [SalonTreatment],
         appointments: [BeautyAppointment],
         appointmentTreatments: [AppointmentTreatment],
+        reminderAdjustments: [SalonReminderAdjustment],
         enabled: Bool,
         leadDays: Int,
         now: Date = .now,
@@ -19,13 +20,16 @@ enum SalonNotificationScheduler {
             treatments: treatments,
             appointments: appointments,
             appointmentTreatments: appointmentTreatments,
+            reminderAdjustments: reminderAdjustments,
             referenceDate: now,
             calendar: calendar
         )
         let plans = actions.compactMap { action -> LocalNotificationPlan? in
             guard action.kind == .salonNeedsBooking,
                   let fireDate = LocalNotificationReconciler.fireDate(
-                    for: action.date, leadDays: leadDays, now: now, calendar: calendar
+                    for: action.snoozedReminderDate ?? action.date,
+                    leadDays: action.snoozedReminderDate == nil ? leadDays : 0,
+                    now: now, calendar: calendar
                   )
             else { return nil }
             return LocalNotificationPlan(

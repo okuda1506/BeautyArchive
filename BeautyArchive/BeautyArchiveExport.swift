@@ -13,6 +13,7 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
     let productUnits: [ProductUnitEntry]
     let appointments: [AppointmentEntry]
     let appointmentTreatments: [AppointmentTreatmentEntry]
+    let salonReminderAdjustments: [SalonReminderAdjustmentEntry]
     let reminderSettings: ReminderSettingsEntry
 
     @MainActor
@@ -22,7 +23,7 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
         leadChoice: Int,
         customLeadDays: Int
     ) throws {
-        schemaVersion = 1
+        schemaVersion = 2
         exportedAt = .now
         salonVisits = try context.fetch(FetchDescriptor<SalonVisit>()).map(SalonVisitEntry.init)
         salonTreatments = try context.fetch(FetchDescriptor<SalonTreatment>()).map(SalonTreatmentEntry.init)
@@ -40,6 +41,8 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
         appointments = try context.fetch(FetchDescriptor<BeautyAppointment>()).map(AppointmentEntry.init)
         appointmentTreatments = try context.fetch(FetchDescriptor<AppointmentTreatment>())
             .map(AppointmentTreatmentEntry.init)
+        salonReminderAdjustments = try context.fetch(FetchDescriptor<SalonReminderAdjustment>())
+            .map(SalonReminderAdjustmentEntry.init)
         reminderSettings = ReminderSettingsEntry(
             enabledOnThisDevice: remindersEnabled,
             leadChoice: leadChoice,
@@ -250,6 +253,24 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
         let enabledOnThisDevice: Bool
         let leadChoice: Int
         let customLeadDays: Int
+    }
+
+    struct SalonReminderAdjustmentEntry: Encodable, Sendable {
+        let id: UUID
+        let treatmentID: UUID
+        let baseDueDate: Date
+        let overrideDueDate: Date?
+        let snoozedUntil: Date?
+        let updatedAt: Date
+
+        init(_ value: SalonReminderAdjustment) {
+            id = value.id
+            treatmentID = value.treatmentID
+            baseDueDate = value.baseDueDate
+            overrideDueDate = value.overrideDueDate
+            snoozedUntil = value.snoozedUntil
+            updatedAt = value.updatedAt
+        }
     }
 
     private enum ExportError: LocalizedError {
