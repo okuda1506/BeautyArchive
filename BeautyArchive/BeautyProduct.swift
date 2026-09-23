@@ -52,4 +52,13 @@ final class BeautyProduct {
     var category: ProductCategory {
         ProductCategory(rawValue: categoryRaw) ?? .cosmetics
     }
+
+    var validPurchaseURL: URL? {
+        guard let components = URLComponents(string: purchaseURL),
+              components.scheme?.lowercased() == "https",
+              let host = components.host, !host.isEmpty,
+              components.user == nil, components.password == nil
+        else { return nil }
+        return components.url
+    }
 }

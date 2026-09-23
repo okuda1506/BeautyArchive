@@ -15,7 +15,9 @@ enum ProductReplacementActions {
                 title: product.name,
                 date: estimate.date,
                 imageData: product.imageData.isEmpty ? nil : product.imageData,
-                detail: "開封 \(openedDate) · \(estimate.source.title)"
+                detail: "開封 \(openedDate) · \(estimate.source.title)",
+                productID: product.id,
+                destinationURL: product.validPurchaseURL
             )
         }
         .sorted { $0.date < $1.date }
