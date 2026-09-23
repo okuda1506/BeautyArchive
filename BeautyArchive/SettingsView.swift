@@ -1,8 +1,10 @@
+import SwiftData
 import SwiftUI
 import UIKit
 import UserNotifications
 
 struct SettingsView: View {
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
@@ -11,6 +13,8 @@ struct SettingsView: View {
     @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @State private var isLoadingAuthorization = true
     @State private var errorMessage: String?
+    @State private var isExporting = false
+    @State private var exportedURL: URL?
 
     private var isAuthorized: Bool {
         switch authorizationStatus {
@@ -62,13 +66,28 @@ struct SettingsView: View {
                     Text("美容の目安は通知をオフにしてもHomeで確認できます。")
                         .foregroundStyle(.secondary)
                 }
+                Section("データの書き出し") {
+                    Button("記録と写真のファイルを作成", systemImage: "square.and.arrow.up") {
+                        Task { await exportData() }
+                    }
+                    .disabled(isExporting)
+                    if isExporting { ProgressView("ファイルを作成中") }
+                    if let exportedURL {
+                        ShareLink(item: exportedURL) {
+                            Label("作成したファイルを保存・共有", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                    Text("この端末で取得できる記録を書き出します。iCloudで同期中のデータは含まれない場合があります。形式はJSONで、保存済み写真をBase64データとして含みます。このファイルからのアプリ内復元は未対応です。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .navigationTitle("設定")
             .task { await refreshAuthorization() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { Task { await refreshAuthorization() } }
             }
-            .alert("通知設定を変更できませんでした", isPresented: Binding(
+            .alert("操作を完了できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
             )) {
@@ -76,6 +95,25 @@ struct SettingsView: View {
             } message: {
                 Text(errorMessage ?? "")
             }
+        }
+    }
+
+    @MainActor
+    private func exportData() async {
+        guard !isExporting else { return }
+        isExporting = true
+        exportedURL = nil
+        defer { isExporting = false }
+        do {
+            let export = try BeautyArchiveExport(
+                context: modelContext,
+                remindersEnabled: remindersEnabled,
+                leadChoice: leadChoice,
+                customLeadDays: customLeadDays
+            )
+            exportedURL = try await export.writeFile()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
