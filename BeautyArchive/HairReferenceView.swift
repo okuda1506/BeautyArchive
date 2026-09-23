@@ -107,6 +107,13 @@ private struct HairReferenceDetail: View {
 
     var body: some View {
         List {
+            Section {
+                NavigationLink {
+                    StylistPresentationView(reference: reference)
+                } label: {
+                    Label("美容師に見せる", systemImage: "rectangle.on.rectangle")
+                }
+            }
             if !photos.isEmpty {
                 Section("参考写真") {
                     PhotoGallery(photos: photos.map { StoredPhoto(id: $0.id, data: $0.imageData) })
