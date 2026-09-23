@@ -198,7 +198,7 @@ private struct PhotoImage: View {
     }
 }
 
-private enum PhotoImageProcessor {
+enum PhotoImageProcessor {
     nonisolated static func optimizedJPEG(_ data: Data) -> Data? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let thumbnailOptions: [CFString: Any] = [
