@@ -43,7 +43,7 @@ struct ContentView: View {
             }
 
             Tab(value: AppTab.calendar) {
-                DestinationPlaceholder(title: "予定", symbol: "calendar")
+                AppointmentListView()
             } label: {
                 Image(systemName: "calendar")
                     .accessibilityLabel("予定")
@@ -406,7 +406,8 @@ private struct HomeView: View {
     ContentView()
         .modelContainer(for: [
             SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
-            HairStyleReference.self, ReferencePhoto.self
+            HairStyleReference.self, ReferencePhoto.self,
+            BeautyAppointment.self, AppointmentTreatment.self
         ], inMemory: true)
 }
 
@@ -435,6 +436,7 @@ private struct HomeView: View {
     ])
     .modelContainer(for: [
         SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
-        HairStyleReference.self, ReferencePhoto.self
+        HairStyleReference.self, ReferencePhoto.self,
+        BeautyAppointment.self, AppointmentTreatment.self
     ], inMemory: true)
 }
