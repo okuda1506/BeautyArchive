@@ -196,6 +196,8 @@ private struct HomeView: View {
     @State private var showingAddVisit = false
     @State private var showingPreparation = false
     @State private var pendingPreparation = false
+    @State private var editingAppointment: BeautyAppointment?
+    @State private var pendingAppointment: BeautyAppointment?
     @State private var completingAppointment: BeautyAppointment?
     @State private var homeAlert: HomeAlert?
     @State private var editingDueAction: HomeAction?
@@ -222,6 +224,9 @@ private struct HomeView: View {
                 if pendingPreparation {
                     pendingPreparation = false
                     showingPreparation = true
+                } else if let pendingAppointment {
+                    self.pendingAppointment = nil
+                    editingAppointment = pendingAppointment
                 }
             }) {
                 allActionsSheet
@@ -239,6 +244,12 @@ private struct HomeView: View {
             }
             .sheet(isPresented: $showingPreparation) {
                 StylistPreparationPicker()
+            }
+            .sheet(item: $editingAppointment) { appointment in
+                AppointmentForm(
+                    appointment: appointment,
+                    treatments: appointmentTreatments.filter { $0.appointmentID == appointment.id }
+                )
             }
             .alert(homeAlert?.title ?? "", isPresented: Binding(
                 get: { homeAlert != nil },
@@ -388,6 +399,13 @@ private struct HomeView: View {
                             .font(.subheadline)
                     }
                 }
+                if action.kind == .salonBooked || action.kind == .salonNeedsRecord {
+                    Button("予定を変更・キャンセル", systemImage: "calendar.badge.clock") {
+                        editAppointment(for: action)
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
             }
             .padding(18)
         }
@@ -443,6 +461,16 @@ private struct HomeView: View {
                 adjustmentMenu(for: action)
                     .labelStyle(.iconOnly)
                     .frame(width: 44, height: 44)
+            } else if action.kind == .salonBooked || action.kind == .salonNeedsRecord {
+                Menu {
+                    Button("予定を変更・キャンセル", systemImage: "calendar.badge.clock") {
+                        editAppointment(for: action)
+                    }
+                } label: {
+                    Label("予定の操作", systemImage: "ellipsis.circle")
+                }
+                .labelStyle(.iconOnly)
+                .frame(width: 44, height: 44)
             }
         }
     }
@@ -566,6 +594,16 @@ private struct HomeView: View {
         case .itemReplacement:
             selectedProductID = action.productID
             selectedTab = .items
+        }
+    }
+
+    private func editAppointment(for action: HomeAction) {
+        guard let appointment = appointments.first(where: { $0.id == action.id }) else { return }
+        if showingAllActions {
+            pendingAppointment = appointment
+            showingAllActions = false
+        } else {
+            editingAppointment = appointment
         }
     }
 

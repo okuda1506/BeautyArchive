@@ -296,6 +296,11 @@ struct AppointmentForm: View {
                         Text("予約済み").tag("booked")
                         Text("キャンセル済み").tag("cancelled")
                     }
+                    if statusRaw == "cancelled" {
+                        Text("外部の予約サービスで行った予約は、ここではキャンセルされません。予約先でも手続きしてください。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Section("対象の施術") {
                     ForEach($drafts) { $draft in
