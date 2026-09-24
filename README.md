@@ -125,3 +125,5 @@ The app stores records locally. Google Calendar authorization is optional; the i
 To check Google Calendar write requests without a simulator or Google account, run `bash scripts/check-google-calendar-writer.sh` on macOS. This uses a local URLProtocol mock and does not verify live Google authorization or API behavior.
 
 Run `bash scripts/check-google-account-binding.sh` to check that an account switch cannot return the new account's token to an in-flight calendar operation. This uses an in-memory credential store.
+
+Before a release, follow the [Google Calendar real-account QA checklist (Japanese)](docs/GoogleCalendarManualQA.ja.md). These live-account checks have not yet been performed.
