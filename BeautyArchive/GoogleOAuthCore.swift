@@ -29,7 +29,7 @@ struct GoogleOAuthAttempt {
     let state: String
 }
 
-struct GoogleOAuthTokens {
+nonisolated struct GoogleOAuthTokens: Codable {
     let accessToken: String
     let refreshToken: String?
     let expiresAt: Date
@@ -37,7 +37,7 @@ struct GoogleOAuthTokens {
     var needsRefresh: Bool { expiresAt <= Date.now.addingTimeInterval(60) }
 }
 
-struct GoogleAccountIdentity {
+nonisolated struct GoogleAccountIdentity: Codable {
     let subject: String
     let email: String?
 }
