@@ -588,6 +588,10 @@ struct AppointmentForm: View {
                         Text("外部の予約サービスで行った予約は、ここではキャンセルされません。予約先でも手続きしてください。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    } else if appointment != nil {
+                        Text("外部サービスで予約した場合、B/ONEで日時を変更しても予約先には反映されません。予約先でも変更してください。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 Section("対象の施術") {
