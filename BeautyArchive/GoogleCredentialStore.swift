@@ -129,10 +129,19 @@ actor GoogleCredentialManager {
         try store.delete()
     }
 
-    func accessToken() async throws -> String {
-        if let refreshTask { return try await refreshTask.value }
+    func accessToken(for accountSubject: String) async throws -> String {
+        if let refreshTask {
+            let token = try await refreshTask.value
+            guard try store.load()?.identity.subject == accountSubject else {
+                throw GoogleCredentialError.credentialsChanged
+            }
+            return token
+        }
         guard let credentials = try store.load() else {
             throw GoogleCredentialError.notConnected
+        }
+        guard credentials.identity.subject == accountSubject else {
+            throw GoogleCredentialError.credentialsChanged
         }
         if !credentials.tokens.needsRefresh { return credentials.tokens.accessToken }
         guard let refreshToken = credentials.tokens.refreshToken else {

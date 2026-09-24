@@ -42,9 +42,9 @@ final class GoogleCalendarConnection {
         return try await credentials.currentAccount()
     }
 
-    func accessToken() async throws -> String {
+    func accessToken(for accountSubject: String) async throws -> String {
         guard let credentials else { throw GoogleOAuthError.invalidClientID }
-        return try await credentials.accessToken()
+        return try await credentials.accessToken(for: accountSubject)
     }
 
     func connect(anchor: UIWindow) async throws -> GoogleAccountIdentity {
