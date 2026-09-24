@@ -792,7 +792,7 @@ private struct HomeView: View {
         .modelContainer(for: [
             SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
             HairStyleReference.self, ReferencePhoto.self,
-            BeautyAppointment.self, AppointmentTreatment.self,
+            BeautyAppointment.self, AppointmentTreatment.self, GoogleAppointmentLink.self,
             BeautyProduct.self, ProductUnit.self,
             SalonReminderAdjustment.self
         ], inMemory: true)
@@ -824,7 +824,7 @@ private struct HomeView: View {
     .modelContainer(for: [
         SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
         HairStyleReference.self, ReferencePhoto.self,
-        BeautyAppointment.self, AppointmentTreatment.self,
+        BeautyAppointment.self, AppointmentTreatment.self, GoogleAppointmentLink.self,
         BeautyProduct.self, ProductUnit.self,
         SalonReminderAdjustment.self
     ], inMemory: true)

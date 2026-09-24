@@ -6,14 +6,17 @@ struct AppointmentListView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \BeautyAppointment.startAt) private var appointments: [BeautyAppointment]
     @Query private var treatments: [AppointmentTreatment]
+    @Query private var googleLinks: [GoogleAppointmentLink]
     @State private var selectedDate = Date.now
     @State private var showingAdd = false
     @State private var errorMessage: String?
     @State private var googleEvents: [GoogleCalendarEvent] = []
     @State private var googleEventsMonth: Date?
     @State private var isGoogleConnected = false
+    @State private var googleAccountSubject: String?
     @State private var isLoadingGoogleEvents = false
     @State private var googleErrorMessage: String?
+    @State private var googleSyncErrorMessage: String?
     @State private var googleReloadCount = 0
 
     private let googleConnection = GoogleCalendarConnection.shared
@@ -36,6 +39,14 @@ struct AppointmentListView: View {
 
     private var selectedGoogleEvents: [GoogleCalendarEvent] {
         visibleGoogleEvents.filter { $0.overlaps(selectedDate) }
+    }
+
+    private var googleLinksNeedingAttention: [GoogleAppointmentLink] {
+        let localIDs = Set(appointments.map(\.id))
+        return googleLinks.filter {
+            $0.state == .failedUpsert || $0.state == .failedDelete
+                || (!localIDs.contains($0.appointmentID) && $0.state.needsSync)
+        }
     }
 
     var body: some View {
@@ -79,6 +90,33 @@ struct AppointmentListView: View {
                             Button("再試行") { googleReloadCount += 1 }
                         }
                     }
+                    if let googleSyncErrorMessage {
+                        Text("Googleへの反映状態を保存できませんでした。\n\(googleSyncErrorMessage)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if !googleLinksNeedingAttention.isEmpty {
+                    Section("Googleへの反映を確認") {
+                        ForEach(googleLinksNeedingAttention) { link in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(link.title).font(.headline)
+                                Text(link.state.title)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                if let lastError = link.lastError {
+                                    Text(lastError).font(.caption).foregroundStyle(.secondary)
+                                }
+                                if googleAccountSubject != link.accountSubject {
+                                    Text("連携していたGoogleアカウントに再接続すると反映できます。")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Button("再試行") { retryGoogleSync(link) }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .navigationTitle("予定")
@@ -94,11 +132,22 @@ struct AppointmentListView: View {
             .task(id: GoogleLoadKey(monthStart: monthStart, reloadCount: googleReloadCount)) {
                 await loadGoogleEvents(for: monthStart)
             }
+            .task { await syncGooglePending() }
             .onReceive(NotificationCenter.default.publisher(for: .googleCalendarConnectionChanged)) { _ in
                 googleReloadCount += 1
+                Task { await syncGooglePending() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .googleCalendarSyncChanged)) { _ in
+                googleReloadCount += 1
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .googleCalendarSyncPersistenceFailed)) { notice in
+                googleSyncErrorMessage = notice.object as? String
             }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { googleReloadCount += 1 }
+                if phase == .active {
+                    googleReloadCount += 1
+                    Task { await syncGooglePending() }
+                }
             }
             .alert("削除できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
@@ -136,6 +185,11 @@ struct AppointmentListView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if let link = googleLinks.first(where: { $0.appointmentID == appointment.id }) {
+                Label(link.state.title, systemImage: "calendar")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
     }
@@ -157,25 +211,35 @@ struct AppointmentListView: View {
     }
 
     @MainActor
+    private func syncGooglePending() async {
+        guard googleConnection.isConfigured else { return }
+        googleSyncErrorMessage = await GoogleCalendarSyncService.shared.syncPending(in: modelContext)
+    }
+
+    @MainActor
     private func loadGoogleEvents(for month: Date) async {
         googleEventsMonth = month
         googleEvents = []
         googleErrorMessage = nil
         guard googleConnection.isConfigured else {
             isGoogleConnected = false
+            googleAccountSubject = nil
             isLoadingGoogleEvents = false
             return
         }
         isLoadingGoogleEvents = true
+        googleAccountSubject = nil
         do {
-            guard try await googleConnection.currentAccount() != nil else {
+            guard let account = try await googleConnection.currentAccount() else {
                 guard !Task.isCancelled else { return }
                 isGoogleConnected = false
+                googleAccountSubject = nil
                 isLoadingGoogleEvents = false
                 return
             }
             guard !Task.isCancelled else { return }
             isGoogleConnected = true
+            googleAccountSubject = account.subject
             guard let monthEnd = Calendar.current.date(byAdding: .month, value: 1, to: month)
             else { throw GoogleCalendarAPIError.invalidRange }
             let token = try await googleConnection.accessToken()
@@ -192,15 +256,37 @@ struct AppointmentListView: View {
         }
     }
 
+    private func retryGoogleSync(_ link: GoogleAppointmentLink) {
+        link.stateRaw = link.state.isDeletion
+            ? GoogleAppointmentSyncState.pendingDelete.rawValue
+            : GoogleAppointmentSyncState.pendingUpsert.rawValue
+        link.lastError = nil
+        link.revision = UUID()
+        link.updatedAt = .now
+        do {
+            try modelContext.save()
+            Task { await syncGooglePending() }
+        } catch {
+            modelContext.rollback()
+            googleSyncErrorMessage = error.localizedDescription
+        }
+    }
+
     private func delete(at offsets: IndexSet) {
         for index in offsets {
             let appointment = selectedAppointments[index]
             for treatment in treatments where treatment.appointmentID == appointment.id {
                 modelContext.delete(treatment)
             }
+            for link in googleLinks where link.appointmentID == appointment.id {
+                link.markForDeletion()
+            }
             modelContext.delete(appointment)
         }
-        do { try modelContext.save() }
+        do {
+            try modelContext.save()
+            Task { await syncGooglePending() }
+        }
         catch {
             modelContext.rollback()
             errorMessage = error.localizedDescription
@@ -312,13 +398,21 @@ private struct MonthCalendarView: View {
 }
 
 private struct AppointmentDetail: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query private var googleLinks: [GoogleAppointmentLink]
     let appointment: BeautyAppointment
     let onSave: (Date) -> Void
     @Query private var allTreatments: [AppointmentTreatment]
     @State private var showingEdit = false
+    @State private var googleAccount: GoogleAccountIdentity?
+    @State private var syncErrorMessage: String?
 
     private var treatments: [AppointmentTreatment] {
         allTreatments.filter { $0.appointmentID == appointment.id }
+    }
+
+    private var googleLink: GoogleAppointmentLink? {
+        googleLinks.first { $0.appointmentID == appointment.id }
     }
 
     var body: some View {
@@ -343,6 +437,23 @@ private struct AppointmentDetail: View {
             if !appointment.note.isEmpty {
                 Section("メモ") { Text(appointment.note) }
             }
+            if let googleLink {
+                Section("Googleカレンダー") {
+                    LabeledContent("反映状態", value: googleLink.state.title)
+                    if let lastError = googleLink.lastError {
+                        Text(lastError).font(.caption).foregroundStyle(.secondary)
+                    }
+                    if googleAccount?.subject != googleLink.accountSubject {
+                        Text("連携していたGoogleアカウントに再接続すると反映できます。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if googleLink.state == .failedUpsert || googleLink.state == .failedDelete {
+                        Button("Googleへの反映を再試行") { retryGoogleSync(googleLink) }
+                            .disabled(googleAccount?.subject != googleLink.accountSubject)
+                    }
+                }
+            }
         }
         .navigationTitle(appointment.title)
         .toolbar {
@@ -352,6 +463,41 @@ private struct AppointmentDetail: View {
         }
         .sheet(isPresented: $showingEdit) {
             AppointmentForm(appointment: appointment, treatments: treatments, onSave: onSave)
+        }
+        .task {
+            googleAccount = try? await GoogleCalendarConnection.shared.currentAccount()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .googleCalendarConnectionChanged)) { _ in
+            Task { googleAccount = try? await GoogleCalendarConnection.shared.currentAccount() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .googleCalendarSyncPersistenceFailed)) { notice in
+            syncErrorMessage = notice.object as? String
+        }
+        .alert("Googleへの反映状態を保存できませんでした", isPresented: Binding(
+            get: { syncErrorMessage != nil },
+            set: { if !$0 { syncErrorMessage = nil } }
+        )) {
+            Button("閉じる", role: .cancel) { syncErrorMessage = nil }
+        } message: {
+            Text(syncErrorMessage ?? "")
+        }
+    }
+
+    private func retryGoogleSync(_ link: GoogleAppointmentLink) {
+        link.stateRaw = link.state.isDeletion
+            ? GoogleAppointmentSyncState.pendingDelete.rawValue
+            : GoogleAppointmentSyncState.pendingUpsert.rawValue
+        link.lastError = nil
+        link.revision = UUID()
+        link.updatedAt = .now
+        do {
+            try modelContext.save()
+            Task {
+                syncErrorMessage = await GoogleCalendarSyncService.shared.syncPending(in: modelContext)
+            }
+        } catch {
+            modelContext.rollback()
+            syncErrorMessage = error.localizedDescription
         }
     }
 }
@@ -369,6 +515,7 @@ private struct AppointmentTreatmentDraft: Identifiable {
 struct AppointmentForm: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query private var googleLinks: [GoogleAppointmentLink]
     let appointment: BeautyAppointment?
     let existingTreatments: [AppointmentTreatment]
     let onSave: (Date) -> Void
@@ -380,6 +527,15 @@ struct AppointmentForm: View {
     @State private var statusRaw: String
     @State private var drafts: [AppointmentTreatmentDraft]
     @State private var errorMessage: String?
+    @State private var googleAccount: GoogleAccountIdentity?
+    @State private var isLoadingGoogleAccount = true
+    @State private var googleLinkLoaded = false
+    @State private var syncToGoogle = false
+
+    private var existingGoogleLink: GoogleAppointmentLink? {
+        guard let appointment else { return nil }
+        return googleLinks.first { $0.appointmentID == appointment.id }
+    }
 
     init(
         appointment: BeautyAppointment? = nil,
@@ -449,18 +605,50 @@ struct AppointmentForm: View {
                 Section("メモ（任意）") {
                     TextField("予約時のメモ", text: $note, axis: .vertical)
                 }
+                if googleLinkLoaded && (googleAccount != nil || existingGoogleLink != nil) {
+                    Section("Googleカレンダー") {
+                        Toggle("Googleカレンダーへ反映", isOn: $syncToGoogle)
+                            .disabled(statusRaw == "cancelled")
+                        if let link = existingGoogleLink,
+                           googleAccount?.subject != link.accountSubject {
+                            Text("この予定は別のGoogleアカウントに紐づいています。元のアカウントへの再接続後に反映されます。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("連携したGoogleアカウントのメインカレンダーに反映します。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } else if isLoadingGoogleAccount {
+                    Section("Googleカレンダー") { ProgressView("連携状態を確認中") }
+                }
             }
             .onChange(of: startAt) { _, newStart in
                 if endAt <= newStart { endAt = newStart.addingTimeInterval(3600) }
             }
+            .onChange(of: statusRaw) { _, newStatus in
+                if newStatus == "cancelled" { syncToGoogle = false }
+            }
             .navigationTitle(appointment == nil ? "美容予定を追加" : "美容予定を編集")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                if !googleLinkLoaded {
+                    syncToGoogle = statusRaw != "cancelled"
+                        && (existingGoogleLink.map { !$0.state.isDeletion } ?? false)
+                    googleLinkLoaded = true
+                }
+            }
+            .task {
+                googleAccount = try? await GoogleCalendarConnection.shared.currentAccount()
+                isLoadingGoogleAccount = false
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }.disabled(!isValid)
+                    Button("保存") { save() }.disabled(!isValid || !googleLinkLoaded)
                 }
             }
             .alert("保存できませんでした", isPresented: Binding(
@@ -492,6 +680,11 @@ struct AppointmentForm: View {
 
     private func save() {
         guard isValid else { return }
+        if syncToGoogle && statusRaw != "cancelled"
+            && existingGoogleLink == nil && googleAccount == nil {
+            errorMessage = "Googleカレンダーへの連携状態を確認できません。もう一度お試しください。"
+            return
+        }
         let target = appointment ?? BeautyAppointment(title: title, startAt: startAt, endAt: endAt)
         target.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         target.startAt = startAt
@@ -514,9 +707,21 @@ struct AppointmentForm: View {
             treatment.name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
             if existingByID[draft.id] == nil { modelContext.insert(treatment) }
         }
+        if let existingGoogleLink {
+            if syncToGoogle && !target.isCancelled {
+                existingGoogleLink.update(from: target)
+            } else {
+                existingGoogleLink.markForDeletion()
+            }
+        } else if syncToGoogle && !target.isCancelled, let googleAccount {
+            modelContext.insert(GoogleAppointmentLink(
+                appointment: target, accountSubject: googleAccount.subject
+            ))
+        }
         do {
             try modelContext.save()
             onSave(target.startAt)
+            Task { _ = await GoogleCalendarSyncService.shared.syncPending(in: modelContext) }
             dismiss()
         } catch {
             modelContext.rollback()

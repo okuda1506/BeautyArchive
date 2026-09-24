@@ -13,6 +13,7 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
     let productUnits: [ProductUnitEntry]
     let appointments: [AppointmentEntry]
     let appointmentTreatments: [AppointmentTreatmentEntry]
+    let googleAppointmentLinks: [GoogleAppointmentLinkEntry]
     let salonReminderAdjustments: [SalonReminderAdjustmentEntry]
     let reminderSettings: ReminderSettingsEntry
 
@@ -23,7 +24,7 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
         leadChoice: Int,
         customLeadDays: Int
     ) throws {
-        schemaVersion = 2
+        schemaVersion = 3
         exportedAt = .now
         salonVisits = try context.fetch(FetchDescriptor<SalonVisit>()).map(SalonVisitEntry.init)
         salonTreatments = try context.fetch(FetchDescriptor<SalonTreatment>()).map(SalonTreatmentEntry.init)
@@ -41,6 +42,8 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
         appointments = try context.fetch(FetchDescriptor<BeautyAppointment>()).map(AppointmentEntry.init)
         appointmentTreatments = try context.fetch(FetchDescriptor<AppointmentTreatment>())
             .map(AppointmentTreatmentEntry.init)
+        googleAppointmentLinks = try context.fetch(FetchDescriptor<GoogleAppointmentLink>())
+            .map(GoogleAppointmentLinkEntry.init)
         salonReminderAdjustments = try context.fetch(FetchDescriptor<SalonReminderAdjustment>())
             .map(SalonReminderAdjustmentEntry.init)
         reminderSettings = ReminderSettingsEntry(
@@ -246,6 +249,40 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
             id = value.id
             appointmentID = value.appointmentID
             name = value.name
+        }
+    }
+
+    struct GoogleAppointmentLinkEntry: Encodable, Sendable {
+        let id: UUID
+        let appointmentID: UUID
+        let accountSubject: String
+        let calendarID: String
+        let eventID: String
+        let title: String
+        let startAt: Date
+        let endAt: Date
+        let shopName: String
+        let note: String
+        let stateRaw: String
+        let lastError: String?
+        let revision: UUID
+        let updatedAt: Date
+
+        init(_ value: GoogleAppointmentLink) {
+            id = value.id
+            appointmentID = value.appointmentID
+            accountSubject = value.accountSubject
+            calendarID = value.calendarID
+            eventID = value.eventID
+            title = value.title
+            startAt = value.startAt
+            endAt = value.endAt
+            shopName = value.shopName
+            note = value.note
+            stateRaw = value.stateRaw
+            lastError = value.lastError
+            revision = value.revision
+            updatedAt = value.updatedAt
         }
     }
 
