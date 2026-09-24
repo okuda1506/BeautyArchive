@@ -150,3 +150,5 @@ Google Calendar との連携も予定しているが、Google アカウントは
 `bash scripts/check-google-account-binding.sh`では、連携先を切り替えても進行中の予定操作に別アカウントのトークンが渡らないことを、メモリ内の認証情報で確認できます。
 
 初期リリース前には[Google Calendar実アカウント確認手順](docs/GoogleCalendarManualQA.ja.md)に沿って実機で確認します。この実アカウント検証はまだ実施していません。
+
+iCloudの記録・写真・予定の端末間同期は、[iCloud・端末間同期の実機確認手順](docs/ICloudManualQA.ja.md)に沿って確認します。複数端末での実動作はまだ未検証です。

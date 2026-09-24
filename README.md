@@ -127,3 +127,5 @@ To check Google Calendar write requests without a simulator or Google account, r
 Run `bash scripts/check-google-account-binding.sh` to check that an account switch cannot return the new account's token to an in-flight calendar operation. This uses an in-memory credential store.
 
 Before a release, follow the [Google Calendar real-account QA checklist (Japanese)](docs/GoogleCalendarManualQA.ja.md). These live-account checks have not yet been performed.
+
+Use the [iCloud cross-device QA checklist (Japanese)](docs/ICloudManualQA.ja.md) to verify records, photos, and appointments on two devices. Cross-device behavior has not yet been tested.
