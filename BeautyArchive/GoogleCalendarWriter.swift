@@ -9,10 +9,24 @@ struct GoogleCalendarAppointment {
     let note: String
 
     var eventID: String {
-        "bone" + id.uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+        GoogleCalendarEventIdentity.eventID(for: id)
     }
 
     var ownerMarker: String { id.uuidString.lowercased() }
+}
+
+enum GoogleCalendarEventIdentity {
+    static func eventID(for appointmentID: UUID) -> String {
+        "bone" + appointmentID.uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+    }
+
+    static func appointmentID(eventID: String, ownerMarker: String?) -> UUID? {
+        guard let ownerMarker,
+              let appointmentID = UUID(uuidString: ownerMarker),
+              ownerMarker == appointmentID.uuidString.lowercased(),
+              eventID == self.eventID(for: appointmentID) else { return nil }
+        return appointmentID
+    }
 }
 
 enum GoogleCalendarWriteError: LocalizedError {
