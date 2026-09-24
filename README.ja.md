@@ -126,14 +126,13 @@ Google Calendar との連携も予定しているが、Google アカウントは
 - 美容予定を管理するアプリ内の月間カレンダーと、任意のGoogle Calendar連携。
 - 記録と写真の書き出し。
 
-**現在利用できる機能：** 美容院の来店記録と写真、髪型の参考写真と美容師に見せる画面、施術ごとの次回目安・通知の1週間延期・今回の目安日の変更、アプリ内の美容予定と月間カレンダー、化粧品・香水の商品画像・購入単位の使用履歴・買い替え目安とローカル通知・再購入リンク。Homeには美容院と商品の次の行動をまとめて表示します。Settingsでは通知を設定し、記録と保存済み写真をJSONファイルに書き出せます。
+**現在利用できる機能：** 美容院の来店記録と写真、髪型の参考写真と美容師に見せる画面、施術ごとの次回目安・通知の1週間延期・今回の目安日の変更、アプリ内の美容予定と月間カレンダー、化粧品・香水の商品画像・購入単位の使用履歴・買い替え目安とローカル通知・再購入リンク。Homeには美容院と商品の次の行動をまとめて表示します。Settingsでは通知設定、記録と保存済み写真のJSON書き出し、任意のGoogleカレンダーアカウント認可を利用できます（Googleの実アカウントでは未検証）。
 
-**今後実装する機能：** iCloud同期、Google Calendar連携。メーカー表示の期限や開封後の使用期限の管理は初期リリースに含めません。
+**今後実装する機能：** Google予定のアプリ内表示とB/ONEの美容予定のGoogleカレンダーへの反映。iCloud同期の設定は追加済みですが、複数端末での実動作は未検証です。メーカー表示の期限や開封後の使用期限の管理は初期リリースに含めません。
 
 ## 技術スタック
 
-- **現在のプロジェクト:** Swift、SwiftUI、SwiftData、PhotosPicker、UserNotifications、Xcode、XCTestのテストターゲット。
-- **導入予定:** CloudKit、Google OAuth、Google Calendar API。
+- **現在のプロジェクト:** Swift、SwiftUI、SwiftData、CloudKit、PhotosPicker、UserNotifications、Google OAuth、Google Calendar API、Xcode、XCTestのテストターゲット。
 
 初期リリースは専用バックエンドを持たないローカルファースト構成を想定しています。
 
@@ -144,4 +143,4 @@ Google Calendar との連携も予定しているが、Google アカウントは
 3. Xcodeで`BeautyArchive.xcodeproj`を開きます。
 4. `BeautyArchive`スキームと利用可能なシミュレータを選択して実行します。
 
-現在の記録は端末内に保存されます。この段階ではGoogle Calendarの認証情報やその他の連携設定は不要です。
+記録は端末内に保存されます。Googleカレンダーの認可は任意です。iOS用OAuthクライアントIDとcallback URL schemeはプロジェクトに設定済みなので、ビルドに追加の認証情報は不要です。Google認可の動作確認には、OAuth同意画面で許可されたGoogleアカウントと、プロジェクトで有効化されたGoogle Calendar APIが必要です。

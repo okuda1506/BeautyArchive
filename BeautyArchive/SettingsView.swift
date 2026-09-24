@@ -17,6 +17,11 @@ struct SettingsView: View {
     @State private var errorMessage: String?
     @State private var isExporting = false
     @State private var exportedURL: URL?
+    @State private var googleAccount: GoogleAccountIdentity?
+    @State private var isLoadingGoogleAccount = true
+    @State private var isGoogleBusy = false
+
+    private let googleConnection = GoogleCalendarConnection.shared
 
     private var isAuthorized: Bool {
         switch authorizationStatus {
@@ -74,6 +79,37 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                if googleConnection.isConfigured {
+                    Section("Googleカレンダー") {
+                        if isLoadingGoogleAccount {
+                            ProgressView("連携状態を確認中")
+                        } else if let googleAccount {
+                            Label("連携済み", systemImage: "checkmark.circle.fill")
+                            if let email = googleAccount.email {
+                                Text(email)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text("B/ONEで作成した美容予定は、このアプリで変更してください。Google側の変更は元の美容予定に自動反映されません。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button("連携を解除", role: .destructive) {
+                                Task { await disconnectGoogle() }
+                            }
+                            .disabled(isGoogleBusy)
+                        } else {
+                            Text("B/ONEからGoogleカレンダーにアクセスするため、Googleアカウントの認可が必要です。")
+                                .foregroundStyle(.secondary)
+                            Button("Googleカレンダーと連携") {
+                                Task { await connectGoogle() }
+                            }
+                            .disabled(isGoogleBusy)
+                        }
+                        if isGoogleBusy { ProgressView() }
+                        Text("GoogleアカウントはB/ONEへのログインには使用しません。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Section("データの書き出し") {
                     Button("記録と写真のファイルを作成", systemImage: "square.and.arrow.up") {
                         Task { await exportData() }
@@ -93,11 +129,13 @@ struct SettingsView: View {
             .navigationTitle("設定")
             .task { await refreshAuthorization() }
             .task { await refreshICloudStatus() }
+            .task { await refreshGoogleAccount() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                     Task {
                         await refreshAuthorization()
                         await refreshICloudStatus()
+                        await refreshGoogleAccount()
                     }
                 }
             }
@@ -161,6 +199,57 @@ struct SettingsView: View {
             iCloudStatus = try await CKContainer.default().accountStatus()
         } catch {
             iCloudStatus = .couldNotDetermine
+        }
+    }
+
+    @MainActor
+    private func refreshGoogleAccount() async {
+        guard !isGoogleBusy else { return }
+        guard googleConnection.isConfigured else {
+            isLoadingGoogleAccount = false
+            return
+        }
+        do {
+            googleAccount = try await googleConnection.currentAccount()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoadingGoogleAccount = false
+    }
+
+    @MainActor
+    private func connectGoogle() async {
+        guard !isGoogleBusy else { return }
+        isGoogleBusy = true
+        defer { isGoogleBusy = false }
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .filter { $0.activationState == .foregroundActive }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+        guard let window else {
+            errorMessage = GoogleOAuthBrowserError.cannotStart.localizedDescription
+            return
+        }
+        do {
+            googleAccount = try await googleConnection.connect(anchor: window)
+        } catch GoogleOAuthBrowserError.cancelled {
+            // A user closing the Google sheet leaves the existing connection unchanged.
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func disconnectGoogle() async {
+        guard !isGoogleBusy else { return }
+        isGoogleBusy = true
+        defer { isGoogleBusy = false }
+        do {
+            try await googleConnection.disconnect()
+            googleAccount = nil
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

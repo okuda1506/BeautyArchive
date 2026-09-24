@@ -103,14 +103,13 @@ The planned initial release includes:
 - An in-app monthly calendar for beauty appointments, with optional Google Calendar integration.
 - Export of records and photos.
 
-**Available now:** Salon visit records and photos, hairstyle references and a stylist-facing summary, treatment timing with a one-week notification snooze or a one-time due-date change, and local beauty appointments in a monthly calendar. Products support images, per-purchase usage records, replacement estimates and local reminders, and repurchase links. Home brings salon and product actions together. Settings provides local notification controls and a JSON export of records and saved photos.
+**Available now:** Salon visit records and photos, hairstyle references and a stylist-facing summary, treatment timing with a one-week notification snooze or a one-time due-date change, and local beauty appointments in a monthly calendar. Products support images, per-purchase usage records, replacement estimates and local reminders, and repurchase links. Home brings salon and product actions together. Settings provides local notification controls, a JSON export of records and saved photos, and optional Google Calendar account authorization (not yet verified with a real Google account).
 
-**Still planned:** iCloud sync and Google Calendar integration. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
+**Still planned:** Connecting Google events to the in-app calendar and reflecting B/ONE appointments in Google Calendar. iCloud sync is configured but has not been verified across devices. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
 
 ## Tech Stack
 
-- **Currently in the project:** Swift, SwiftUI, SwiftData, PhotosPicker, UserNotifications, Xcode, and XCTest targets.
-- **Planned:** CloudKit, Google OAuth, and the Google Calendar API.
+- **Currently in the project:** Swift, SwiftUI, SwiftData, CloudKit, PhotosPicker, UserNotifications, Google OAuth, Google Calendar API, Xcode, and XCTest targets.
 
 The planned architecture is local-first, without a dedicated app backend for the initial release.
 
@@ -121,4 +120,4 @@ The planned architecture is local-first, without a dedicated app backend for the
 3. Open `BeautyArchive.xcodeproj` in Xcode.
 4. Select the `BeautyArchive` scheme and an available simulator, then run the app.
 
-The app stores current records locally. Google Calendar credentials and other integrations are not required to run it at this stage.
+The app stores records locally. Google Calendar authorization is optional; the iOS OAuth client ID and callback scheme are already configured in the project, so no additional credentials are needed to build it. Testing Google authorization requires a Google account permitted by the project's OAuth consent screen and an enabled Google Calendar API.
