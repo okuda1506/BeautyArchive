@@ -129,3 +129,5 @@ Run `bash scripts/check-google-account-binding.sh` to check that an account swit
 Before a release, follow the [Google Calendar real-account QA checklist (Japanese)](docs/GoogleCalendarManualQA.ja.md). These live-account checks have not yet been performed.
 
 Use the [iCloud cross-device QA checklist (Japanese)](docs/ICloudManualQA.ja.md) to verify records, photos, and appointments on two devices. Cross-device behavior has not yet been tested.
+
+Reminder timing choices use iCloud key-value storage, while notification permission and the on/off switch remain device-specific. Cross-device preference sync has not yet been verified on real devices.

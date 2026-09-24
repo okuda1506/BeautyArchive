@@ -8,9 +8,8 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
+    @Environment(ReminderTimingSettings.self) private var reminderTiming
     @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
-    @AppStorage(ReminderPreferences.leadChoiceKey) private var leadChoice = 0
-    @AppStorage(ReminderPreferences.customLeadDaysKey) private var customLeadDays = 2
     @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @State private var isLoadingAuthorization = true
     @State private var iCloudStatus: CKAccountStatus?
@@ -46,17 +45,26 @@ struct SettingsView: View {
                     ))
                     .disabled(isLoadingAuthorization)
 
-                    Picker("通知タイミング", selection: $leadChoice) {
+                    Picker("通知タイミング", selection: Binding(
+                        get: { reminderTiming.leadChoice },
+                        set: { reminderTiming.setLeadChoice($0) }
+                    )) {
                         Text("目安日当日").tag(0)
                         Text("1日前").tag(1)
                         Text("3日前").tag(3)
                         Text("7日前").tag(7)
                         Text("日数を指定").tag(-1)
                     }
-                    if leadChoice == -1 {
-                        Stepper("\(customLeadDays)日前", value: $customLeadDays, in: 0...365)
+                    if reminderTiming.leadChoice == -1 {
+                        Stepper("\(reminderTiming.customLeadDays)日前", value: Binding(
+                            get: { reminderTiming.customLeadDays },
+                            set: { reminderTiming.setCustomLeadDays($0) }
+                        ), in: 0...365)
                     }
                     Text("通知は選んだ日の午前9時に届きます。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("iCloudを利用できる場合、通知タイミングは同じApple Accountの端末へ引き継がれます。反映には時間がかかる場合があります。通知の許可とオン・オフは端末ごとです。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(authorizationDescription)
@@ -163,8 +171,8 @@ struct SettingsView: View {
             let export = try BeautyArchiveExport(
                 context: modelContext,
                 remindersEnabled: remindersEnabled,
-                leadChoice: leadChoice,
-                customLeadDays: customLeadDays
+                leadChoice: reminderTiming.leadChoice,
+                customLeadDays: reminderTiming.customLeadDays
             )
             exportedURL = try await export.writeFile()
         } catch {
