@@ -3,24 +3,54 @@ import SwiftUI
 
 struct AppointmentListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \BeautyAppointment.startAt) private var appointments: [BeautyAppointment]
     @Query private var treatments: [AppointmentTreatment]
     @State private var selectedDate = Date.now
     @State private var showingAdd = false
     @State private var errorMessage: String?
+    @State private var googleEvents: [GoogleCalendarEvent] = []
+    @State private var googleEventsMonth: Date?
+    @State private var isGoogleConnected = false
+    @State private var isLoadingGoogleEvents = false
+    @State private var googleErrorMessage: String?
+    @State private var googleReloadCount = 0
+
+    private let googleConnection = GoogleCalendarConnection.shared
+    private let googleAPI = GoogleCalendarAPI()
+
+    private var monthStart: Date {
+        Calendar.current.dateInterval(of: .month, for: selectedDate)?.start
+            ?? Calendar.current.startOfDay(for: selectedDate)
+    }
+
+    private var visibleGoogleEvents: [GoogleCalendarEvent] {
+        guard googleEventsMonth == monthStart else { return [] }
+        let localIDs = Set(appointments.map(\.id))
+        return googleEvents.filter { !$0.isMirror(of: localIDs) }
+    }
 
     private var selectedAppointments: [BeautyAppointment] {
         appointments.filter { Calendar.current.isDate($0.startAt, inSameDayAs: selectedDate) }
     }
 
+    private var selectedGoogleEvents: [GoogleCalendarEvent] {
+        visibleGoogleEvents.filter { $0.overlaps(selectedDate) }
+    }
+
     var body: some View {
         NavigationStack {
             List {
-                MonthCalendarView(selectedDate: $selectedDate, appointments: appointments)
+                MonthCalendarView(
+                    selectedDate: $selectedDate,
+                    appointments: appointments,
+                    googleEvents: visibleGoogleEvents
+                )
                     .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
 
                 Section(selectedDate.formatted(date: .complete, time: .omitted)) {
-                    if selectedAppointments.isEmpty {
+                    if selectedAppointments.isEmpty && selectedGoogleEvents.isEmpty
+                        && !isLoadingGoogleEvents && googleErrorMessage == nil {
                         Text(appointments.isEmpty
                             ? "美容予定はまだありません。右上の＋から追加できます。"
                             : "この日の予定はありません")
@@ -35,6 +65,20 @@ struct AppointmentListView: View {
                         }
                         .onDelete(perform: delete)
                     }
+                    if isLoadingGoogleEvents && isGoogleConnected {
+                        ProgressView("Googleの予定を読み込み中")
+                    }
+                    ForEach(selectedGoogleEvents) { event in
+                        googleEventRow(event)
+                    }
+                    if let googleErrorMessage {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Googleの予定を取得できませんでした。\n\(googleErrorMessage)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Button("再試行") { googleReloadCount += 1 }
+                        }
+                    }
                 }
             }
             .navigationTitle("予定")
@@ -46,6 +90,15 @@ struct AppointmentListView: View {
             }
             .sheet(isPresented: $showingAdd) {
                 AppointmentForm { selectedDate = $0 }
+            }
+            .task(id: GoogleLoadKey(monthStart: monthStart, reloadCount: googleReloadCount)) {
+                await loadGoogleEvents(for: monthStart)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .googleCalendarConnectionChanged)) { _ in
+                googleReloadCount += 1
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { googleReloadCount += 1 }
             }
             .alert("削除できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
@@ -87,6 +140,58 @@ struct AppointmentListView: View {
         .padding(.vertical, 4)
     }
 
+    private func googleEventRow(_ event: GoogleCalendarEvent) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(event.title).font(.headline)
+            Text(event.isAllDay
+                 ? "終日"
+                 : "\(event.startAt.formatted(date: .abbreviated, time: .shortened))〜\(event.endAt.formatted(date: .abbreviated, time: .shortened))")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Label("Googleカレンダー · 表示のみ", systemImage: "calendar")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    @MainActor
+    private func loadGoogleEvents(for month: Date) async {
+        googleEventsMonth = month
+        googleEvents = []
+        googleErrorMessage = nil
+        guard googleConnection.isConfigured else {
+            isGoogleConnected = false
+            isLoadingGoogleEvents = false
+            return
+        }
+        isLoadingGoogleEvents = true
+        do {
+            guard try await googleConnection.currentAccount() != nil else {
+                guard !Task.isCancelled else { return }
+                isGoogleConnected = false
+                isLoadingGoogleEvents = false
+                return
+            }
+            guard !Task.isCancelled else { return }
+            isGoogleConnected = true
+            guard let monthEnd = Calendar.current.date(byAdding: .month, value: 1, to: month)
+            else { throw GoogleCalendarAPIError.invalidRange }
+            let token = try await googleConnection.accessToken()
+            let events = try await googleAPI.events(
+                calendarID: "primary", from: month, to: monthEnd, accessToken: token
+            )
+            guard !Task.isCancelled else { return }
+            googleEvents = events
+            isLoadingGoogleEvents = false
+        } catch {
+            guard !Task.isCancelled else { return }
+            googleErrorMessage = error.localizedDescription
+            isLoadingGoogleEvents = false
+        }
+    }
+
     private func delete(at offsets: IndexSet) {
         for index in offsets {
             let appointment = selectedAppointments[index]
@@ -103,9 +208,15 @@ struct AppointmentListView: View {
     }
 }
 
+private struct GoogleLoadKey: Equatable {
+    let monthStart: Date
+    let reloadCount: Int
+}
+
 private struct MonthCalendarView: View {
     @Binding var selectedDate: Date
     let appointments: [BeautyAppointment]
+    let googleEvents: [GoogleCalendarEvent]
 
     private let calendar = Calendar.current
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
@@ -163,6 +274,7 @@ private struct MonthCalendarView: View {
     private func dayButton(for date: Date) -> some View {
         let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
         let hasAppointment = appointments.contains { calendar.isDate($0.startAt, inSameDayAs: date) }
+        let hasGoogleEvent = googleEvents.contains { $0.overlaps(date, calendar: calendar) }
         return Button {
             selectedDate = date
         } label: {
@@ -172,15 +284,25 @@ private struct MonthCalendarView: View {
                     .foregroundStyle(isSelected ? Color(uiColor: .systemBackground) : Color.primary)
                     .frame(width: 34, height: 34)
                     .background(isSelected ? Color.primary : Color.clear, in: Circle())
-                Circle()
-                    .fill(hasAppointment ? (isSelected ? Color.primary : Color.accentColor) : Color.clear)
-                    .frame(width: 5, height: 5)
+                HStack(spacing: 3) {
+                    if hasAppointment {
+                        Circle().fill(Color.accentColor).frame(width: 5, height: 5)
+                    }
+                    if hasGoogleEvent {
+                        Circle().fill(Color(uiColor: .systemBlue)).frame(width: 5, height: 5)
+                    }
+                }
+                .frame(height: 5)
             }
             .frame(maxWidth: .infinity, minHeight: 48)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(date.formatted(date: .complete, time: .omitted))\(hasAppointment ? "、予定あり" : "")")
+        .accessibilityLabel(
+            "\(date.formatted(date: .complete, time: .omitted))"
+            + (hasAppointment ? "、B/ONEの予定あり" : "")
+            + (hasGoogleEvent ? "、Googleの予定あり" : "")
+        )
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 

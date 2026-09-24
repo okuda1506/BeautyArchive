@@ -15,6 +15,14 @@ struct GoogleCalendarEvent: Identifiable, Equatable {
     func isMirror(of localAppointmentIDs: Set<UUID>) -> Bool {
         sourceAppointmentID.map(localAppointmentIDs.contains) ?? false
     }
+
+    func overlaps(_ day: Date, calendar: Calendar = .current) -> Bool {
+        let dayStart = calendar.startOfDay(for: day)
+        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else {
+            return false
+        }
+        return startAt < dayEnd && endAt > dayStart
+    }
 }
 
 enum GoogleCalendarAPIError: LocalizedError {

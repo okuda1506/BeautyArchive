@@ -1,6 +1,12 @@
 import Foundation
 import UIKit
 
+extension Notification.Name {
+    static let googleCalendarConnectionChanged = Notification.Name(
+        "BONEGoogleCalendarConnectionChanged"
+    )
+}
+
 @MainActor
 final class GoogleCalendarConnection {
     static let shared = GoogleCalendarConnection()
@@ -36,6 +42,11 @@ final class GoogleCalendarConnection {
         return try await credentials.currentAccount()
     }
 
+    func accessToken() async throws -> String {
+        guard let credentials else { throw GoogleOAuthError.invalidClientID }
+        return try await credentials.accessToken()
+    }
+
     func connect(anchor: UIWindow) async throws -> GoogleAccountIdentity {
         guard let configuration, let oauth, let credentials else {
             throw GoogleOAuthError.invalidClientID
@@ -46,11 +57,13 @@ final class GoogleCalendarConnection {
         )
         let result = try await flow.authorize()
         try await credentials.connect(identity: result.identity, tokens: result.tokens)
+        NotificationCenter.default.post(name: .googleCalendarConnectionChanged, object: nil)
         return result.identity
     }
 
     func disconnect() async throws {
         guard let credentials else { throw GoogleOAuthError.invalidClientID }
         try await credentials.disconnect()
+        NotificationCenter.default.post(name: .googleCalendarConnectionChanged, object: nil)
     }
 }

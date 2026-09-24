@@ -103,9 +103,9 @@ The planned initial release includes:
 - An in-app monthly calendar for beauty appointments, with optional Google Calendar integration.
 - Export of records and photos.
 
-**Available now:** Salon visit records and photos, hairstyle references and a stylist-facing summary, treatment timing with a one-week notification snooze or a one-time due-date change, and local beauty appointments in a monthly calendar. Products support images, per-purchase usage records, replacement estimates and local reminders, and repurchase links. Home brings salon and product actions together. Settings provides local notification controls, a JSON export of records and saved photos, and optional Google Calendar account authorization (not yet verified with a real Google account).
+**Available now:** Salon visit records and photos, hairstyle references and a stylist-facing summary, treatment timing with a one-week notification snooze or a one-time due-date change, and local beauty appointments in a monthly calendar. Products support images, per-purchase usage records, replacement estimates and local reminders, and repurchase links. Home brings salon and product actions together. Settings provides local notification controls, a JSON export of records and saved photos, and optional Google Calendar account authorization. Connected users can see Google events read-only in the monthly calendar. Google authorization and event loading have not yet been verified with a real account.
 
-**Still planned:** Connecting Google events to the in-app calendar and reflecting B/ONE appointments in Google Calendar. iCloud sync is configured but has not been verified across devices. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
+**Still planned:** Reflecting B/ONE appointments in Google Calendar. iCloud sync is configured but has not been verified across devices. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
 
 ## Tech Stack
 
