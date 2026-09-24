@@ -8,8 +8,13 @@ struct GoogleCalendarEvent: Identifiable, Equatable {
     let endAt: Date
     let isAllDay: Bool
     let webURL: URL?
+    let sourceAppointmentID: UUID?
 
     var id: String { "\(calendarID):\(remoteID)" }
+
+    func isMirror(of localAppointmentIDs: Set<UUID>) -> Bool {
+        sourceAppointmentID.map(localAppointmentIDs.contains) ?? false
+    }
 }
 
 enum GoogleCalendarAPIError: LocalizedError {
@@ -146,7 +151,11 @@ struct GoogleCalendarAPI {
                 startAt: startValue,
                 endAt: endValue,
                 isAllDay: start.date != nil,
-                webURL: item.htmlLink.flatMap(URL.init(string:))
+                webURL: item.htmlLink.flatMap(URL.init(string:)),
+                sourceAppointmentID: GoogleCalendarEventIdentity.appointmentID(
+                    eventID: id,
+                    ownerMarker: item.extendedProperties?.privateValues?["boneAppointmentID"]
+                )
             )
         }
         return (events, page.nextPageToken)
@@ -203,6 +212,15 @@ private struct EventItem: Decodable {
     let start: EventTime?
     let end: EventTime?
     let htmlLink: String?
+    let extendedProperties: EventPrivateProperties?
+}
+
+private struct EventPrivateProperties: Decodable {
+    let privateValues: [String: String]?
+
+    enum CodingKeys: String, CodingKey {
+        case privateValues = "private"
+    }
 }
 
 private struct EventTime: Decodable {
