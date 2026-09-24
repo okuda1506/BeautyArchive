@@ -51,6 +51,7 @@ enum GoogleOAuthError: LocalizedError {
     case authorizationFailed
     case missingCode
     case missingRefreshToken
+    case calendarPermissionMissing
     case unauthorized
     case httpStatus(Int)
     case invalidResponse
@@ -65,6 +66,7 @@ enum GoogleOAuthError: LocalizedError {
         case .authorizationFailed: "Googleカレンダーの認可を完了できませんでした。"
         case .missingCode: "Googleから認可コードを受け取れませんでした。"
         case .missingRefreshToken: "Googleカレンダーとの再連携が必要です。"
+        case .calendarPermissionMissing: "Googleカレンダーへのアクセスを許可してください。"
         case .unauthorized: "Googleカレンダーの認可が切れました。再連携してください。"
         case .httpStatus(let status): "Googleの認可処理に失敗しました（HTTP \(status)）。"
         case .invalidResponse: "Googleの認可応答を読み取れませんでした。"
@@ -73,6 +75,8 @@ enum GoogleOAuthError: LocalizedError {
 }
 
 struct GoogleOAuthCore {
+    static let calendarEventsScope = "https://www.googleapis.com/auth/calendar.events"
+
     private let configuration: GoogleOAuthConfiguration
     private let session: URLSession
 
@@ -94,7 +98,7 @@ struct GoogleOAuthCore {
             URLQueryItem(name: "redirect_uri", value: configuration.redirectURI),
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "scope", value: [
-                "openid", "email", "https://www.googleapis.com/auth/calendar.events"
+                "openid", "email", Self.calendarEventsScope
             ].joined(separator: " ")),
             URLQueryItem(name: "access_type", value: "offline"),
             URLQueryItem(name: "code_challenge", value: challenge),
@@ -233,6 +237,12 @@ struct GoogleOAuthCore {
               response.tokenType.lowercased() == "bearer" else {
             throw GoogleOAuthError.invalidResponse
         }
+        if let scope = response.scope {
+            let grantedScopes = Set(scope.split(whereSeparator: \.isWhitespace).map(String.init))
+            guard grantedScopes.contains(Self.calendarEventsScope) else {
+                throw GoogleOAuthError.calendarPermissionMissing
+            }
+        }
         return GoogleOAuthTokens(
             accessToken: response.accessToken,
             refreshToken: response.refreshToken ?? previousRefreshToken,
@@ -246,6 +256,7 @@ private struct TokenResponse: Decodable {
     let refreshToken: String?
     let expiresIn: Int
     let tokenType: String
+    let scope: String?
 }
 
 private struct UserInfoResponse: Decodable {
