@@ -83,6 +83,7 @@ struct ContentView: View {
             Tab(value: AppTab.home) {
                 HomeView(
                     actions: actions,
+                    visits: visits,
                     appointments: appointments,
                     appointmentTreatments: appointmentTreatments,
                     salonReminderAdjustments: salonReminderAdjustments,
@@ -222,6 +223,7 @@ private struct HomeView: View {
 
     @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
     let actions: [HomeAction]
+    let visits: [SalonVisit]
     let appointments: [BeautyAppointment]
     let appointmentTreatments: [AppointmentTreatment]
     let salonReminderAdjustments: [SalonReminderAdjustment]
@@ -237,6 +239,8 @@ private struct HomeView: View {
     @State private var pendingPreparation = false
     @State private var editingAppointment: BeautyAppointment?
     @State private var pendingAppointment: BeautyAppointment?
+    @State private var creatingAppointment: HomeAction?
+    @State private var pendingNewAppointment: HomeAction?
     @State private var registeringProduct: BeautyProduct?
     @State private var pendingProductRegistration: BeautyProduct?
     @State private var completingAppointment: BeautyAppointment?
@@ -270,6 +274,9 @@ private struct HomeView: View {
                 } else if let pendingAppointment {
                     self.pendingAppointment = nil
                     editingAppointment = pendingAppointment
+                } else if let pendingNewAppointment {
+                    self.pendingNewAppointment = nil
+                    creatingAppointment = pendingNewAppointment
                 } else if let pendingProductRegistration {
                     self.pendingProductRegistration = nil
                     registeringProduct = pendingProductRegistration
@@ -302,6 +309,13 @@ private struct HomeView: View {
                 AppointmentForm(
                     appointment: appointment,
                     treatments: appointmentTreatments.filter { $0.appointmentID == appointment.id }
+                )
+            }
+            .sheet(item: $creatingAppointment) { action in
+                AppointmentForm(
+                    suggestedTitle: "\(action.title)の予約",
+                    suggestedShopName: visits.first(where: { $0.id == action.visitID })?.salonName ?? "",
+                    suggestedTreatmentName: action.title
                 )
             }
             .sheet(item: $registeringProduct) { product in
@@ -457,6 +471,11 @@ private struct HomeView: View {
                 }
 
                 if action.kind == .salonNeedsBooking {
+                    Button("予約済みの予定を追加", systemImage: "calendar.badge.plus") {
+                        recordBooking(for: action)
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                     Button("前回の記録", systemImage: "chevron.right") {
                         selectedVisitID = action.visitID
                         selectedTab = .archive
@@ -527,9 +546,17 @@ private struct HomeView: View {
             .accessibilityLabel("\(action.title)、\(dateSummary(for: action))、\(actionTitle(for: action))")
 
             if action.kind == .salonNeedsBooking, action.baselineDate != nil {
-                adjustmentMenu(for: action)
-                    .labelStyle(.iconOnly)
-                    .frame(width: 44, height: 44)
+                Menu {
+                    Button("予約済みの予定を追加", systemImage: "calendar.badge.plus") {
+                        recordBooking(for: action)
+                    }
+                    Divider()
+                    adjustmentOptions(for: action)
+                } label: {
+                    Label("予約・目安の操作", systemImage: "ellipsis.circle")
+                }
+                .labelStyle(.iconOnly)
+                .frame(width: 44, height: 44)
             } else if action.kind == .salonBooked || action.kind == .salonNeedsRecord {
                 Menu {
                     Button("予定を変更・キャンセル", systemImage: "calendar.badge.clock") {
@@ -691,6 +718,16 @@ private struct HomeView: View {
         }
     }
 
+    private func recordBooking(for action: HomeAction) {
+        guard action.kind == .salonNeedsBooking else { return }
+        if showingAllActions {
+            pendingNewAppointment = action
+            showingAllActions = false
+        } else {
+            creatingAppointment = action
+        }
+    }
+
     private func registerReplacement(for action: HomeAction) {
         guard let productID = action.productID,
               let product = products.first(where: { $0.id == productID }) else { return }
@@ -704,25 +741,30 @@ private struct HomeView: View {
 
     private func adjustmentMenu(for action: HomeAction) -> some View {
         Menu {
-            Button("1週間後に知らせる", systemImage: "clock.arrow.circlepath") {
-                postponeReminder(for: action)
-            }
-            .disabled(!remindersEnabled)
-            if !remindersEnabled {
-                Text("通知は設定でオンにできます")
-            }
-            Button("今回の目安日を変更", systemImage: "calendar.badge.clock") {
-                editDueDate(for: action)
-            }
-            if activeAdjustment(for: action) != nil {
-                Button("調整を解除", systemImage: "arrow.uturn.backward", role: .destructive) {
-                    clearAdjustment(for: action)
-                }
-            }
+            adjustmentOptions(for: action)
         } label: {
             Label("今回は見送る", systemImage: "ellipsis.circle")
         }
         .accessibilityLabel("\(action.title)の通知・目安を調整")
+    }
+
+    @ViewBuilder
+    private func adjustmentOptions(for action: HomeAction) -> some View {
+        Button("1週間後に知らせる", systemImage: "clock.arrow.circlepath") {
+            postponeReminder(for: action)
+        }
+        .disabled(!remindersEnabled)
+        if !remindersEnabled {
+            Text("通知は設定でオンにできます")
+        }
+        Button("今回の目安日を変更", systemImage: "calendar.badge.clock") {
+            editDueDate(for: action)
+        }
+        if activeAdjustment(for: action) != nil {
+            Button("調整を解除", systemImage: "arrow.uturn.backward", role: .destructive) {
+                clearAdjustment(for: action)
+            }
+        }
     }
 
     private func editDueDate(for action: HomeAction) {

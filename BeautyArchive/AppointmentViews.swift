@@ -518,6 +518,7 @@ struct AppointmentForm: View {
     @Query private var googleLinks: [GoogleAppointmentLink]
     let appointment: BeautyAppointment?
     let existingTreatments: [AppointmentTreatment]
+    let isExternalBookingDraft: Bool
     let onSave: (Date) -> Void
     @State private var title: String
     @State private var startAt: Date
@@ -540,20 +541,24 @@ struct AppointmentForm: View {
     init(
         appointment: BeautyAppointment? = nil,
         treatments: [AppointmentTreatment] = [],
+        suggestedTitle: String = "",
+        suggestedShopName: String = "",
+        suggestedTreatmentName: String = "",
         onSave: @escaping (Date) -> Void = { _ in }
     ) {
         self.appointment = appointment
         self.existingTreatments = treatments
+        self.isExternalBookingDraft = appointment == nil && !suggestedTreatmentName.isEmpty
         self.onSave = onSave
         let defaultStart = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now
-        _title = State(initialValue: appointment?.title ?? "")
+        _title = State(initialValue: appointment?.title ?? suggestedTitle)
         _startAt = State(initialValue: appointment?.startAt ?? defaultStart)
         _endAt = State(initialValue: appointment?.endAt ?? defaultStart.addingTimeInterval(3600))
-        _shopName = State(initialValue: appointment?.shopName ?? "")
+        _shopName = State(initialValue: appointment?.shopName ?? suggestedShopName)
         _note = State(initialValue: appointment?.note ?? "")
         _statusRaw = State(initialValue: appointment?.statusRaw ?? "booked")
         _drafts = State(initialValue: treatments.isEmpty
-            ? [AppointmentTreatmentDraft()]
+            ? [AppointmentTreatmentDraft(name: suggestedTreatmentName)]
             : treatments.map { AppointmentTreatmentDraft(id: $0.id, name: $0.name) })
     }
 
@@ -561,6 +566,11 @@ struct AppointmentForm: View {
         NavigationStack {
             Form {
                 Section("予定") {
+                    if isExternalBookingDraft {
+                        Text("予約先で確定した日時を入力してください。ここで保存しても、予約先の日時は変更されません。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     TextField("予定名（例：美容院）", text: $title)
                     DatePicker("開始", selection: $startAt)
                     DatePicker("終了", selection: $endAt)
