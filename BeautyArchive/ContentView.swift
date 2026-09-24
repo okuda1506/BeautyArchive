@@ -10,6 +10,12 @@ private enum AppTab: Hashable {
 }
 
 struct ContentView: View {
+    private struct ContentAlert {
+        let title: String
+        let message: String
+    }
+
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
     @AppStorage(ReminderPreferences.leadChoiceKey) private var leadChoice = 0
@@ -27,7 +33,7 @@ struct ContentView: View {
     @State private var selectedVisitID: UUID?
     @State private var selectedProductID: UUID?
     @State private var notificationTask: Task<Void, Never>?
-    @State private var notificationError: String?
+    @State private var contentAlert: ContentAlert?
 
     init(actions: [HomeAction]? = nil) {
         self.previewActions = actions
@@ -120,17 +126,43 @@ struct ContentView: View {
         }
         .tint(.primary)
         .onAppear { scheduleNotificationReconciliation() }
+        .task { await syncPendingGoogleAppointments() }
         .onChange(of: notificationSignature) { _, _ in scheduleNotificationReconciliation() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { scheduleNotificationReconciliation() }
+            if phase == .active {
+                scheduleNotificationReconciliation()
+                Task { await syncPendingGoogleAppointments() }
+            }
         }
-        .alert("通知を予約できませんでした", isPresented: Binding(
-            get: { notificationError != nil },
-            set: { if !$0 { notificationError = nil } }
+        .onReceive(NotificationCenter.default.publisher(for: .googleCalendarConnectionChanged)) { _ in
+            Task { await syncPendingGoogleAppointments() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .googleCalendarSyncPersistenceFailed)) { notice in
+            if let message = notice.object as? String {
+                contentAlert = ContentAlert(
+                    title: "Googleへの反映状態を保存できませんでした", message: message
+                )
+            }
+        }
+        .alert(contentAlert?.title ?? "", isPresented: Binding(
+            get: { contentAlert != nil },
+            set: { if !$0 { contentAlert = nil } }
         )) {
-            Button("閉じる", role: .cancel) { notificationError = nil }
+            Button("閉じる", role: .cancel) { contentAlert = nil }
         } message: {
-            Text(notificationError ?? "")
+            Text(contentAlert?.message ?? "")
+        }
+    }
+
+    @MainActor
+    private func syncPendingGoogleAppointments() async {
+        guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1",
+              GoogleCalendarConnection.shared.isConfigured else { return }
+        if let error = await GoogleCalendarSyncService.shared.syncPending(in: modelContext),
+           contentAlert == nil {
+            contentAlert = ContentAlert(
+                title: "Googleへの反映状態を保存できませんでした", message: error
+            )
         }
     }
 
@@ -161,7 +193,9 @@ struct ContentView: View {
                 leadDays: leadDays
             )
             guard !Task.isCancelled else { return }
-            if let error = productError ?? salonError { notificationError = error }
+            if let error = productError ?? salonError {
+                contentAlert = ContentAlert(title: "通知を予約できませんでした", message: error)
+            }
         }
     }
 }
