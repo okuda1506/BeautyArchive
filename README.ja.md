@@ -146,3 +146,5 @@ Google Calendar との連携も予定しているが、Google アカウントは
 記録は端末内に保存されます。Googleカレンダーの認可は任意です。iOS用OAuthクライアントIDとcallback URL schemeはプロジェクトに設定済みなので、ビルドに追加の認証情報は不要です。Google認可の動作確認には、OAuth同意画面で許可されたGoogleアカウントと、プロジェクトで有効化されたGoogle Calendar APIが必要です。
 
 シミュレータやGoogleアカウントを使わずにGoogleカレンダーへの書き込みリクエストを検証するには、macOSで`bash scripts/check-google-calendar-writer.sh`を実行します。ローカルのURLProtocolモックを使用するため、実際のGoogle認可・API動作の確認にはなりません。
+
+初期リリース前には[Google Calendar実アカウント確認手順](docs/GoogleCalendarManualQA.ja.md)に沿って実機で確認します。この実アカウント検証はまだ実施していません。

@@ -123,3 +123,5 @@ The planned architecture is local-first, without a dedicated app backend for the
 The app stores records locally. Google Calendar authorization is optional; the iOS OAuth client ID and callback scheme are already configured in the project, so no additional credentials are needed to build it. Testing Google authorization requires a Google account permitted by the project's OAuth consent screen and an enabled Google Calendar API.
 
 To check Google Calendar write requests without a simulator or Google account, run `bash scripts/check-google-calendar-writer.sh` on macOS. This uses a local URLProtocol mock and does not verify live Google authorization or API behavior.
+
+Before a release, follow the [Google Calendar real-account QA checklist (Japanese)](docs/GoogleCalendarManualQA.ja.md). These live-account checks have not yet been performed.
