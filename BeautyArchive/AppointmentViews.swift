@@ -242,7 +242,7 @@ struct AppointmentListView: View {
             googleAccountSubject = account.subject
             guard let monthEnd = Calendar.current.date(byAdding: .month, value: 1, to: month)
             else { throw GoogleCalendarAPIError.invalidRange }
-            let token = try await googleConnection.accessToken()
+            let token = try await googleConnection.accessToken(for: account.subject)
             let events = try await googleAPI.events(
                 calendarID: "primary", from: month, to: monthEnd, accessToken: token
             )

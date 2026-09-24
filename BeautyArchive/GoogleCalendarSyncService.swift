@@ -90,7 +90,7 @@ final class GoogleCalendarSyncService {
             let deleting = link.state.isDeletion
             let revision = link.revision
             do {
-                let token = try await connection.accessToken()
+                let token = try await connection.accessToken(for: link.accountSubject)
                 if deleting {
                     do {
                         try await writer.delete(

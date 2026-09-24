@@ -147,4 +147,6 @@ Google Calendar との連携も予定しているが、Google アカウントは
 
 シミュレータやGoogleアカウントを使わずにGoogleカレンダーへの書き込みリクエストを検証するには、macOSで`bash scripts/check-google-calendar-writer.sh`を実行します。ローカルのURLProtocolモックを使用するため、実際のGoogle認可・API動作の確認にはなりません。
 
+`bash scripts/check-google-account-binding.sh`では、連携先を切り替えても進行中の予定操作に別アカウントのトークンが渡らないことを、メモリ内の認証情報で確認できます。
+
 初期リリース前には[Google Calendar実アカウント確認手順](docs/GoogleCalendarManualQA.ja.md)に沿って実機で確認します。この実アカウント検証はまだ実施していません。
