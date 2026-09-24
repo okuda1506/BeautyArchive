@@ -10,9 +10,15 @@ import SwiftData
 
 @main
 struct BeautyArchiveApp: App {
+    @AppStorage("onboarding.hasStarted") private var hasStarted = false
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if hasStarted {
+                ContentView()
+            } else {
+                FirstLaunchView { hasStarted = true }
+            }
         }
         .modelContainer(for: [
             SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
