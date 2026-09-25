@@ -152,3 +152,5 @@ Google Calendar との連携も予定しているが、Google アカウントは
 初期リリース前には[Google Calendar実アカウント確認手順](docs/GoogleCalendarManualQA.ja.md)に沿って実機で確認します。この実アカウント検証はまだ実施していません。
 
 iCloudの記録・写真・予定の端末間同期は、[iCloud・端末間同期の実機確認手順](docs/ICloudManualQA.ja.md)に沿って確認します。複数端末での実動作はまだ未検証です。
+
+通知タイミングの選択値はiCloudのKey-value storageで端末間へ引き継ぐ構成です。通知許可と通知オン・オフは端末ごとに管理します。この設定同期も実機ではまだ未検証です。

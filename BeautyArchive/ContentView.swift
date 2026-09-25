@@ -17,9 +17,8 @@ struct ContentView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(ReminderTimingSettings.self) private var reminderTiming
     @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
-    @AppStorage(ReminderPreferences.leadChoiceKey) private var leadChoice = 0
-    @AppStorage(ReminderPreferences.customLeadDaysKey) private var customLeadDays = 2
     private let previewActions: [HomeAction]?
     @Query private var visits: [SalonVisit]
     @Query private var treatments: [SalonTreatment]
@@ -75,7 +74,7 @@ struct ContentView: View {
         let adjustmentChanges = salonReminderAdjustments.map {
             "\($0.id.uuidString):\($0.updatedAt.timeIntervalSince1970):\($0.baseDueDate.timeIntervalSince1970):\($0.overrideDueDate?.timeIntervalSince1970 ?? 0):\($0.snoozedUntil?.timeIntervalSince1970 ?? 0)"
         }.sorted().joined(separator: "|")
-        return "\(remindersEnabled):\(leadChoice):\(customLeadDays):\(unitChanges):\(productChanges):\(visitChanges):\(treatmentChanges):\(appointmentChanges):\(appointmentTreatmentChanges):\(adjustmentChanges)"
+        return "\(remindersEnabled):\(reminderTiming.leadChoice):\(reminderTiming.customLeadDays):\(unitChanges):\(productChanges):\(visitChanges):\(treatmentChanges):\(appointmentChanges):\(appointmentTreatmentChanges):\(adjustmentChanges)"
     }
 
     var body: some View {
@@ -175,7 +174,8 @@ struct ContentView: View {
         notificationTask = Task {
             await previousTask?.value
             let leadDays = ReminderPreferences.effectiveLeadDays(
-                choice: leadChoice, customDays: customLeadDays
+                choice: reminderTiming.leadChoice,
+                customDays: reminderTiming.customLeadDays
             )
             let productError = await ProductNotificationScheduler.reconcile(
                 products: products,
@@ -865,6 +865,7 @@ private struct HomeView: View {
 
 #Preview("Empty") {
     ContentView()
+        .environment(ReminderTimingSettings(syncEnabled: false))
         .modelContainer(for: [
             SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
             HairStyleReference.self, ReferencePhoto.self,
@@ -897,6 +898,7 @@ private struct HomeView: View {
             detail: "使用履歴から予測"
         )
     ])
+    .environment(ReminderTimingSettings(syncEnabled: false))
     .modelContainer(for: [
         SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
         HairStyleReference.self, ReferencePhoto.self,
