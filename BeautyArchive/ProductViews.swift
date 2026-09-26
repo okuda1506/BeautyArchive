@@ -219,6 +219,7 @@ private struct ProductForm: View {
     @State private var imageData: Data
     @State private var selectedImage: PhotosPickerItem?
     @State private var isLoadingImage = false
+    @State private var suppressAutomaticImageFetch = false
     @State private var errorMessage: String?
 
     init(product: BeautyProduct? = nil) {
@@ -268,7 +269,10 @@ private struct ProductForm: View {
                             .scaledToFit()
                             .frame(maxHeight: 220)
                             .accessibilityLabel("選択中の商品画像")
-                        Button("画像を削除", role: .destructive) { imageData = Data() }
+                        Button("画像を削除", role: .destructive) {
+                            imageData = Data()
+                            suppressAutomaticImageFetch = true
+                        }
                     }
                     PhotosPicker(selection: $selectedImage, matching: .images) {
                         Label(imageData.isEmpty ? "画像を追加" : "画像を変更", systemImage: "photo")
@@ -277,6 +281,17 @@ private struct ProductForm: View {
                     .onChange(of: selectedImage) { _, item in
                         guard let item else { return }
                         Task { await importImage(item) }
+                    }
+                    if imageData.isEmpty, validPurchaseURL != nil {
+                        Button("URLから画像を取得", systemImage: "arrow.down.circle") {
+                            Task { await fetchImageFromURL() }
+                        }
+                        .disabled(isLoadingImage)
+                        if product == nil && !suppressAutomaticImageFetch {
+                            Text("画像なしで保存すると、購入先URLから自動取得を試みます。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     if isLoadingImage { ProgressView("画像を読み込み中") }
                 }
@@ -334,13 +349,34 @@ private struct ProductForm: View {
                 return
             }
             imageData = optimized
+            suppressAutomaticImageFetch = false
         } catch {
             errorMessage = "画像を読み込めませんでした。\(error.localizedDescription)"
         }
     }
 
+    @MainActor
+    private func fetchImageFromURL() async {
+        guard !isLoadingImage, let url = validPurchaseURL else { return }
+        isLoadingImage = true
+        defer { isLoadingImage = false }
+        do {
+            guard let image = try await ProductImageFetcher.fetch(from: url) else {
+                errorMessage = "このURLから商品画像を取得できませんでした。画像は手動で追加できます。"
+                return
+            }
+            guard validPurchaseURL == url else { return }
+            imageData = image
+            suppressAutomaticImageFetch = false
+        } catch {
+            errorMessage = "画像を取得できませんでした。\(error.localizedDescription)"
+        }
+    }
+
     private func save() {
         guard isValid else { return }
+        let imageURL = product == nil && imageData.isEmpty && !suppressAutomaticImageFetch
+            ? validPurchaseURL : nil
         let target = product ?? BeautyProduct(name: name, category: category)
         target.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         target.brand = brand.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -352,6 +388,13 @@ private struct ProductForm: View {
         if product == nil { modelContext.insert(target) }
         do {
             try modelContext.save()
+            if let imageURL {
+                ProductImageAutoLoader.schedule(
+                    productID: target.id, url: imageURL,
+                    sourceURL: trimmedURL, savedAt: target.updatedAt,
+                    container: modelContext.container
+                )
+            }
             dismiss()
         } catch {
             modelContext.rollback()
