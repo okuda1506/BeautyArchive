@@ -222,6 +222,9 @@ private struct ProductImageReviewSheet: View {
     @State private var selectedImage: PhotosPickerItem?
     @State private var isLoadingImage = false
     @State private var isManualImage = false
+    @State private var sourceImageData: Data
+    @State private var isCropped = false
+    @State private var showingCrop = false
     @State private var errorMessage: String?
 
     init(
@@ -233,6 +236,7 @@ private struct ProductImageReviewSheet: View {
         self.onAccept = onAccept
         self.onSaveWithoutImage = onSaveWithoutImage
         _imageData = State(initialValue: image)
+        _sourceImageData = State(initialValue: image)
     }
 
     var body: some View {
@@ -251,6 +255,16 @@ private struct ProductImageReviewSheet: View {
                             .scaledToFit()
                             .frame(maxWidth: .infinity, maxHeight: 340)
                             .accessibilityLabel("保存前の商品画像")
+                    }
+                    Button("トリミング", systemImage: "crop") {
+                        showingCrop = true
+                    }
+                    .disabled(isLoadingImage)
+                    if isCropped {
+                        Button("元の画像に戻す", systemImage: "arrow.uturn.backward") {
+                            imageData = sourceImageData
+                            isCropped = false
+                        }
                     }
                     PhotosPicker(selection: $selectedImage, matching: .images) {
                         Label("別の画像を選ぶ", systemImage: "photo")
@@ -281,6 +295,12 @@ private struct ProductImageReviewSheet: View {
                     .disabled(isLoadingImage)
                 }
             }
+            .sheet(isPresented: $showingCrop) {
+                ProductImageCropSheet(imageData: sourceImageData) { cropped in
+                    imageData = cropped
+                    isCropped = true
+                }
+            }
             .alert("画像を読み込めませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -309,6 +329,8 @@ private struct ProductImageReviewSheet: View {
                 return
             }
             imageData = optimized
+            sourceImageData = optimized
+            isCropped = false
             isManualImage = true
         } catch {
             errorMessage = error.localizedDescription
