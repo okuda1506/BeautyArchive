@@ -1,7 +1,5 @@
 import Foundation
 import LinkPresentation
-import OSLog
-import SwiftData
 import UniformTypeIdentifiers
 
 enum ProductImageFetcher {
@@ -41,36 +39,5 @@ enum ProductImageFetcher {
             PhotoImageProcessor.optimizedJPEG(original)
         }).value else { throw FetchError.unsupportedImage }
         return optimized
-    }
-}
-
-@MainActor
-enum ProductImageAutoLoader {
-    private static let logger = Logger(
-        subsystem: "com.takuyaokuda.BeautyArchive", category: "ProductImageAutoLoader"
-    )
-
-    static func schedule(
-        productID: UUID, url: URL, sourceURL: String,
-        savedAt: Date, container: ModelContainer
-    ) {
-        Task {
-            do {
-                guard let image = try await ProductImageFetcher.fetch(from: url) else { return }
-                let context = ModelContext(container)
-                let descriptor = FetchDescriptor<BeautyProduct>(
-                    predicate: #Predicate { $0.id == productID }
-                )
-                guard let product = try context.fetch(descriptor).first,
-                      product.imageData.isEmpty,
-                      product.purchaseURL == sourceURL,
-                      product.updatedAt == savedAt else { return }
-                product.imageData = image
-                product.updatedAt = .now
-                try context.save()
-            } catch {
-                logger.info("Automatic product image retrieval failed: \(error.localizedDescription)")
-            }
-        }
     }
 }

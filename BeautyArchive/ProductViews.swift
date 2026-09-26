@@ -207,6 +207,115 @@ private struct ProductDetail: View {
     }
 }
 
+private struct ProductImageReview: Identifiable {
+    let id = UUID()
+    let image: Data
+    let saveAfterReview: Bool
+}
+
+private struct ProductImageReviewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let saveAfterReview: Bool
+    let onAccept: (Data) -> Void
+    let onSaveWithoutImage: () -> Void
+    @State private var imageData: Data
+    @State private var selectedImage: PhotosPickerItem?
+    @State private var isLoadingImage = false
+    @State private var isManualImage = false
+    @State private var errorMessage: String?
+
+    init(
+        image: Data, saveAfterReview: Bool,
+        onAccept: @escaping (Data) -> Void,
+        onSaveWithoutImage: @escaping () -> Void
+    ) {
+        self.saveAfterReview = saveAfterReview
+        self.onAccept = onAccept
+        self.onSaveWithoutImage = onSaveWithoutImage
+        _imageData = State(initialValue: image)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    Text(isManualImage
+                         ? "選択した画像を確認してください。"
+                         : "リンク先から取得した画像です。商品写真と異なる場合は変更できます。")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let image = UIImage(data: imageData) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: 340)
+                            .accessibilityLabel("保存前の商品画像")
+                    }
+                    PhotosPicker(selection: $selectedImage, matching: .images) {
+                        Label("別の画像を選ぶ", systemImage: "photo")
+                    }
+                    .disabled(isLoadingImage)
+                    .onChange(of: selectedImage) { _, item in
+                        guard let item else { return }
+                        Task { await importImage(item) }
+                    }
+                    if isLoadingImage { ProgressView("画像を読み込み中") }
+                    if saveAfterReview {
+                        Button("画像なしで保存") { onSaveWithoutImage() }
+                            .disabled(isLoadingImage)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("商品画像を確認")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("戻る") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saveAfterReview ? "この画像で保存" : "この画像を使用") {
+                        onAccept(imageData)
+                    }
+                    .disabled(isLoadingImage)
+                }
+            }
+            .alert("画像を読み込めませんでした", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("閉じる", role: .cancel) { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "")
+            }
+        }
+    }
+
+    @MainActor
+    private func importImage(_ item: PhotosPickerItem) async {
+        guard !isLoadingImage else { return }
+        isLoadingImage = true
+        defer {
+            selectedImage = nil
+            isLoadingImage = false
+        }
+        do {
+            guard let original = try await item.loadTransferable(type: Data.self),
+                  let optimized = await Task.detached(priority: .userInitiated, operation: {
+                      PhotoImageProcessor.optimizedJPEG(original)
+                  }).value else {
+                errorMessage = "別の画像を選んでください。"
+                return
+            }
+            imageData = optimized
+            isManualImage = true
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
 private struct ProductForm: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -220,6 +329,8 @@ private struct ProductForm: View {
     @State private var selectedImage: PhotosPickerItem?
     @State private var isLoadingImage = false
     @State private var suppressAutomaticImageFetch = false
+    @State private var imageReview: ProductImageReview?
+    @State private var showingImageFetchFailure = false
     @State private var errorMessage: String?
 
     init(product: BeautyProduct? = nil) {
@@ -284,11 +395,11 @@ private struct ProductForm: View {
                     }
                     if imageData.isEmpty, validPurchaseURL != nil {
                         Button("URLから画像を取得", systemImage: "arrow.down.circle") {
-                            Task { await fetchImageFromURL() }
+                            Task { await fetchImageFromURL(saveAfterReview: false) }
                         }
                         .disabled(isLoadingImage)
                         if product == nil && !suppressAutomaticImageFetch {
-                            Text("画像なしで保存すると、購入先URLから自動取得を試みます。")
+                            Text("画像なしで保存すると、購入先URLの画像を取得して確認できます。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -311,6 +422,15 @@ private struct ProductForm: View {
                     TextField("商品についてのメモ", text: $note, axis: .vertical)
                 }
             }
+            .alert("商品画像を取得できませんでした", isPresented: $showingImageFetchFailure) {
+                Button("画像なしで保存") {
+                    suppressAutomaticImageFetch = true
+                    persist(image: Data())
+                }
+                Button("入力に戻る", role: .cancel) { }
+            } message: {
+                Text("画像を手動で選ぶか、画像なしで商品を保存できます。")
+            }
             .navigationTitle(product == nil ? "商品を追加" : "商品を編集")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -320,6 +440,23 @@ private struct ProductForm: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { save() }.disabled(!isValid || isLoadingImage)
                 }
+            }
+            .sheet(item: $imageReview) { review in
+                ProductImageReviewSheet(
+                    image: review.image,
+                    saveAfterReview: review.saveAfterReview,
+                    onAccept: { reviewedImage in
+                        imageReview = nil
+                        imageData = reviewedImage
+                        suppressAutomaticImageFetch = false
+                        if review.saveAfterReview { persist(image: reviewedImage) }
+                    },
+                    onSaveWithoutImage: {
+                        imageReview = nil
+                        suppressAutomaticImageFetch = true
+                        persist(image: Data())
+                    }
+                )
             }
             .alert("操作を完了できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
@@ -356,45 +493,55 @@ private struct ProductForm: View {
     }
 
     @MainActor
-    private func fetchImageFromURL() async {
+    private func fetchImageFromURL(saveAfterReview: Bool) async {
         guard !isLoadingImage, let url = validPurchaseURL else { return }
         isLoadingImage = true
         defer { isLoadingImage = false }
         do {
-            guard let image = try await ProductImageFetcher.fetch(from: url) else {
-                errorMessage = "このURLから商品画像を取得できませんでした。画像は手動で追加できます。"
+            let fetchedImage = try await ProductImageFetcher.fetch(from: url)
+            guard validPurchaseURL == url else { return }
+            guard let image = fetchedImage else {
+                showImageFetchFailure(saveAfterReview: saveAfterReview)
                 return
             }
-            guard validPurchaseURL == url else { return }
-            imageData = image
-            suppressAutomaticImageFetch = false
+            imageReview = ProductImageReview(image: image, saveAfterReview: saveAfterReview)
         } catch {
-            errorMessage = "画像を取得できませんでした。\(error.localizedDescription)"
+            guard validPurchaseURL == url else { return }
+            showImageFetchFailure(saveAfterReview: saveAfterReview)
+        }
+    }
+
+    private func showImageFetchFailure(saveAfterReview: Bool) {
+        if saveAfterReview {
+            showingImageFetchFailure = true
+        } else {
+            errorMessage = "画像を取得できませんでした。手動で画像を追加できます。"
         }
     }
 
     private func save() {
         guard isValid else { return }
-        let imageURL = product == nil && imageData.isEmpty && !suppressAutomaticImageFetch
-            ? validPurchaseURL : nil
+        if product == nil, imageData.isEmpty, !suppressAutomaticImageFetch,
+           validPurchaseURL != nil {
+            Task { await fetchImageFromURL(saveAfterReview: true) }
+        } else {
+            persist(image: imageData)
+        }
+    }
+
+    private func persist(image: Data) {
+        guard isValid else { return }
         let target = product ?? BeautyProduct(name: name, category: category)
         target.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         target.brand = brand.trimmingCharacters(in: .whitespacesAndNewlines)
         target.categoryRaw = category.rawValue
         target.purchaseURL = trimmedURL
         target.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        target.imageData = imageData
+        target.imageData = image
         target.updatedAt = .now
         if product == nil { modelContext.insert(target) }
         do {
             try modelContext.save()
-            if let imageURL {
-                ProductImageAutoLoader.schedule(
-                    productID: target.id, url: imageURL,
-                    sourceURL: trimmedURL, savedAt: target.updatedAt,
-                    container: modelContext.container
-                )
-            }
             dismiss()
         } catch {
             modelContext.rollback()
