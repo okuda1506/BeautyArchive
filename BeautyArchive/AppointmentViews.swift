@@ -305,7 +305,7 @@ private struct MonthCalendarView: View {
     let googleEvents: [GoogleCalendarEvent]
 
     private let calendar = Calendar.current
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+    private let weekCount = 6
 
     private var monthStart: Date {
         let components = calendar.dateComponents([.year, .month], from: selectedDate)
@@ -321,8 +321,9 @@ private struct MonthCalendarView: View {
     private var days: [Date?] {
         let leading = (calendar.component(.weekday, from: monthStart) - calendar.firstWeekday + 7) % 7
         let count = calendar.range(of: .day, in: .month, for: monthStart)?.count ?? 0
-        return Array(repeating: nil, count: leading)
+        let monthDays: [Date?] = Array(repeating: nil, count: leading)
             + (0..<count).map { calendar.date(byAdding: .day, value: $0, to: monthStart) }
+        return monthDays + Array(repeating: nil, count: weekCount * 7 - monthDays.count)
     }
 
     var body: some View {
@@ -339,18 +340,25 @@ private struct MonthCalendarView: View {
             }
             .buttonStyle(.plain)
 
-            LazyVGrid(columns: columns, spacing: 4) {
-                ForEach(Array(weekdays.enumerated()), id: \.offset) { item in
-                    Text(item.element)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 24)
+            // A fixed six-week stack keeps the first List row's measured height stable.
+            VStack(spacing: 4) {
+                HStack(spacing: 0) {
+                    ForEach(Array(weekdays.enumerated()), id: \.offset) { item in
+                        Text(item.element)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 24)
+                    }
                 }
-                ForEach(Array(days.enumerated()), id: \.offset) { item in
-                    if let date = item.element {
-                        dayButton(for: date)
-                    } else {
-                        Color.clear.frame(minHeight: 48)
+                ForEach(0..<weekCount, id: \.self) { week in
+                    HStack(spacing: 0) {
+                        ForEach(0..<7, id: \.self) { weekday in
+                            if let date = days[week * 7 + weekday] {
+                                dayButton(for: date)
+                            } else {
+                                Color.clear.frame(maxWidth: .infinity, minHeight: 48)
+                            }
+                        }
                     }
                 }
             }
