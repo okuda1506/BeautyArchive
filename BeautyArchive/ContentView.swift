@@ -87,6 +87,7 @@ struct ContentView: View {
                     appointmentTreatments: appointmentTreatments,
                     salonReminderAdjustments: salonReminderAdjustments,
                     products: products,
+                    productUnits: productUnits,
                     selectedTab: $selectedTab,
                     selectedVisitID: $selectedVisitID,
                     selectedProductID: $selectedProductID
@@ -228,6 +229,7 @@ private struct HomeView: View {
     let appointmentTreatments: [AppointmentTreatment]
     let salonReminderAdjustments: [SalonReminderAdjustment]
     let products: [BeautyProduct]
+    let productUnits: [ProductUnit]
     @Binding var selectedTab: AppTab
     @Binding var selectedVisitID: UUID?
     @Binding var selectedProductID: UUID?
@@ -259,6 +261,15 @@ private struct HomeView: View {
                 VStack(alignment: .leading, spacing: 30) {
                     header
                     maintenanceSection
+                    HomeItemsSection(
+                        products: products,
+                        units: productUnits,
+                        onSelectProduct: { productID in
+                            selectedProductID = productID
+                            selectedTab = .items
+                        },
+                        onShowAll: { selectedTab = .items }
+                    )
                     categorySection
                 }
                 .padding(.horizontal, 20)
@@ -388,9 +399,9 @@ private struct HomeView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    "まだ記録がありません",
+                    "次のメンテナンスはありません",
                     systemImage: "square.stack",
-                    description: Text("美容院の記録やアイテムを追加すると、次の行動がここに表示されます。")
+                    description: Text("美容院の次回目安やアイテムの買い替え目安があると、ここに表示されます。")
                 )
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
