@@ -11,6 +11,7 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
     let referencePhotos: [ReferencePhotoEntry]
     let products: [ProductEntry]
     let productUnits: [ProductUnitEntry]
+    let purchasePlans: [PurchasePlanEntry]
     let appointments: [AppointmentEntry]
     let appointmentTreatments: [AppointmentTreatmentEntry]
     let googleAppointmentLinks: [GoogleAppointmentLinkEntry]
@@ -24,7 +25,7 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
         leadChoice: Int,
         customLeadDays: Int
     ) throws {
-        schemaVersion = 3
+        schemaVersion = 4
         exportedAt = .now
         salonVisits = try context.fetch(FetchDescriptor<SalonVisit>()).map(SalonVisitEntry.init)
         salonTreatments = try context.fetch(FetchDescriptor<SalonTreatment>()).map(SalonTreatmentEntry.init)
@@ -39,6 +40,8 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
         }
         products = try context.fetch(FetchDescriptor<BeautyProduct>()).map(ProductEntry.init)
         productUnits = try context.fetch(FetchDescriptor<ProductUnit>()).map(ProductUnitEntry.init)
+        purchasePlans = try context.fetch(FetchDescriptor<ProductPurchasePlan>())
+            .map(PurchasePlanEntry.init)
         appointments = try context.fetch(FetchDescriptor<BeautyAppointment>()).map(AppointmentEntry.init)
         appointmentTreatments = try context.fetch(FetchDescriptor<AppointmentTreatment>())
             .map(AppointmentTreatmentEntry.init)
@@ -209,6 +212,40 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
             manualUsageDays = value.manualUsageDays
             adjustedUsageDays = value.adjustedUsageDays
             wantsReplacementNotification = value.wantsReplacementNotification
+            createdAt = value.createdAt
+            updatedAt = value.updatedAt
+        }
+    }
+
+    struct PurchasePlanEntry: Encodable, Sendable {
+        let id: UUID
+        let productID: UUID?
+        let productName: String
+        let categoryRaw: String
+        let plannedAt: Date
+        let hasTime: Bool
+        let vendor: String
+        let purchaseURL: String
+        let note: String
+        let statusRaw: String
+        let purchasedAt: Date?
+        let completedUnitID: UUID?
+        let createdAt: Date
+        let updatedAt: Date
+
+        init(_ value: ProductPurchasePlan) {
+            id = value.id
+            productID = value.productID
+            productName = value.productName
+            categoryRaw = value.categoryRaw
+            plannedAt = value.plannedAt
+            hasTime = value.hasTime
+            vendor = value.vendor
+            purchaseURL = value.purchaseURL
+            note = value.note
+            statusRaw = value.statusRaw
+            purchasedAt = value.purchasedAt
+            completedUnitID = value.completedUnitID
             createdAt = value.createdAt
             updatedAt = value.updatedAt
         }

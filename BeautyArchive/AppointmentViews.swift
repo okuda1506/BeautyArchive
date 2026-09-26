@@ -7,8 +7,10 @@ struct AppointmentListView: View {
     @Query(sort: \BeautyAppointment.startAt) private var appointments: [BeautyAppointment]
     @Query private var treatments: [AppointmentTreatment]
     @Query private var googleLinks: [GoogleAppointmentLink]
+    @Query(sort: \ProductPurchasePlan.plannedAt) private var purchasePlans: [ProductPurchasePlan]
     @State private var selectedDate = Date.now
-    @State private var showingAdd = false
+    @State private var showingAddSalon = false
+    @State private var showingAddPurchase = false
     @State private var errorMessage: String?
     @State private var googleEvents: [GoogleCalendarEvent] = []
     @State private var googleEventsMonth: Date?
@@ -41,6 +43,10 @@ struct AppointmentListView: View {
         visibleGoogleEvents.filter { $0.overlaps(selectedDate) }
     }
 
+    private var selectedPurchasePlans: [ProductPurchasePlan] {
+        purchasePlans.filter { Calendar.current.isDate($0.plannedAt, inSameDayAs: selectedDate) }
+    }
+
     private var googleLinksNeedingAttention: [GoogleAppointmentLink] {
         let localIDs = Set(appointments.map(\.id))
         return googleLinks.filter {
@@ -55,18 +61,27 @@ struct AppointmentListView: View {
                 MonthCalendarView(
                     selectedDate: $selectedDate,
                     appointments: appointments,
+                    purchasePlans: purchasePlans,
                     googleEvents: visibleGoogleEvents
                 )
                     .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
 
                 Section(selectedDate.formatted(date: .complete, time: .omitted)) {
-                    if selectedAppointments.isEmpty && selectedGoogleEvents.isEmpty
+                    if selectedAppointments.isEmpty && selectedPurchasePlans.isEmpty
+                        && selectedGoogleEvents.isEmpty
                         && !isLoadingGoogleEvents && googleErrorMessage == nil {
-                        Text(appointments.isEmpty
-                            ? "美容予定はまだありません。右上の＋から追加できます。"
+                        Text(appointments.isEmpty && purchasePlans.isEmpty
+                            ? "予定はまだありません。右上の＋から追加できます。"
                             : "この日の予定はありません")
                             .foregroundStyle(.secondary)
                     } else {
+                        ForEach(selectedPurchasePlans) { plan in
+                            NavigationLink {
+                                PurchasePlanDetail(plan: plan) { selectedDate = $0 }
+                            } label: {
+                                purchasePlanRow(plan)
+                            }
+                        }
                         ForEach(selectedAppointments) { appointment in
                             NavigationLink {
                                 AppointmentDetail(appointment: appointment) { selectedDate = $0 }
@@ -122,12 +137,24 @@ struct AppointmentListView: View {
             .navigationTitle("予定")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("美容予定を追加", systemImage: "plus") { showingAdd = true }
-                        .labelStyle(.iconOnly)
+                    Menu {
+                        Button("美容院の予定", systemImage: "scissors") {
+                            showingAddSalon = true
+                        }
+                        Button("購入予定", systemImage: "bag") {
+                            showingAddPurchase = true
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .accessibilityLabel("予定を追加")
+                    }
                 }
             }
-            .sheet(isPresented: $showingAdd) {
+            .sheet(isPresented: $showingAddSalon) {
                 AppointmentForm { selectedDate = $0 }
+            }
+            .sheet(isPresented: $showingAddPurchase) {
+                PurchasePlanForm(suggestedDate: selectedDate) { selectedDate = $0 }
             }
             .task(id: GoogleLoadKey(monthStart: monthStart, reloadCount: googleReloadCount)) {
                 await loadGoogleEvents(for: monthStart)
@@ -208,6 +235,28 @@ struct AppointmentListView: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+
+    private func purchasePlanRow(_ plan: ProductPurchasePlan) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(plan.productName).font(.headline)
+                Spacer()
+                Text(plan.status.title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Label(
+                "\(plan.category.title) · \(plan.hasTime ? plan.plannedAt.formatted(date: .omitted, time: .shortened) : "終日")",
+                systemImage: "bag"
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            if !plan.vendor.isEmpty {
+                Text(plan.vendor).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     @MainActor
@@ -302,6 +351,7 @@ private struct GoogleLoadKey: Equatable {
 private struct MonthCalendarView: View {
     @Binding var selectedDate: Date
     let appointments: [BeautyAppointment]
+    let purchasePlans: [ProductPurchasePlan]
     let googleEvents: [GoogleCalendarEvent]
 
     private let calendar = Calendar.current
@@ -368,6 +418,7 @@ private struct MonthCalendarView: View {
     private func dayButton(for date: Date) -> some View {
         let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
         let hasAppointment = appointments.contains { calendar.isDate($0.startAt, inSameDayAs: date) }
+        let hasPurchasePlan = purchasePlans.contains { calendar.isDate($0.plannedAt, inSameDayAs: date) }
         let hasGoogleEvent = googleEvents.contains { $0.overlaps(date, calendar: calendar) }
         return Button {
             selectedDate = date
@@ -382,6 +433,9 @@ private struct MonthCalendarView: View {
                     if hasAppointment {
                         Circle().fill(Color.accentColor).frame(width: 5, height: 5)
                     }
+                    if hasPurchasePlan {
+                        Circle().fill(Color.orange).frame(width: 5, height: 5)
+                    }
                     if hasGoogleEvent {
                         Circle().fill(Color(uiColor: .systemBlue)).frame(width: 5, height: 5)
                     }
@@ -395,6 +449,7 @@ private struct MonthCalendarView: View {
         .accessibilityLabel(
             "\(date.formatted(date: .complete, time: .omitted))"
             + (hasAppointment ? "、B/ONEの予定あり" : "")
+            + (hasPurchasePlan ? "、購入予定あり" : "")
             + (hasGoogleEvent ? "、Googleの予定あり" : "")
         )
         .accessibilityAddTraits(isSelected ? .isSelected : [])
