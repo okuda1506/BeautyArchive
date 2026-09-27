@@ -522,7 +522,7 @@ struct ProductForm: View {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFit()
-                            .frame(maxHeight: 220)
+                            .frame(maxWidth: .infinity, maxHeight: 220, alignment: .center)
                             .accessibilityLabel("選択中の商品画像")
                         Button("画像を削除", role: .destructive) {
                             imageData = Data()
