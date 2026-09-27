@@ -209,7 +209,7 @@ private struct ProductDetail: View {
 
 private struct ProductImageReview: Identifiable {
     let id = UUID()
-    let image: Data
+    let candidates: [ProductImageCandidate]
     let saveAfterReview: Bool
 }
 
@@ -218,6 +218,7 @@ private struct ProductImageReviewSheet: View {
     let saveAfterReview: Bool
     let onAccept: (Data) -> Void
     let onSaveWithoutImage: () -> Void
+    let candidates: [ProductImageCandidate]
     @State private var imageData: Data
     @State private var selectedImage: PhotosPickerItem?
     @State private var isLoadingImage = false
@@ -225,18 +226,21 @@ private struct ProductImageReviewSheet: View {
     @State private var sourceImageData: Data
     @State private var isCropped = false
     @State private var showingCrop = false
+    @State private var selectedCandidateID: UUID
     @State private var errorMessage: String?
 
     init(
-        image: Data, saveAfterReview: Bool,
+        candidates: [ProductImageCandidate], saveAfterReview: Bool,
         onAccept: @escaping (Data) -> Void,
         onSaveWithoutImage: @escaping () -> Void
     ) {
+        self.candidates = candidates
         self.saveAfterReview = saveAfterReview
         self.onAccept = onAccept
         self.onSaveWithoutImage = onSaveWithoutImage
-        _imageData = State(initialValue: image)
-        _sourceImageData = State(initialValue: image)
+        _imageData = State(initialValue: candidates.first?.data ?? Data())
+        _sourceImageData = State(initialValue: candidates.first?.data ?? Data())
+        _selectedCandidateID = State(initialValue: candidates.first?.id ?? UUID())
     }
 
     var body: some View {
@@ -249,12 +253,53 @@ private struct ProductImageReviewSheet: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(isManualImage ? "取得元：写真ライブラリ" : "取得元：\(selectedCandidate?.source ?? "商品ページ")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     if let image = UIImage(data: imageData) {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFit()
                             .frame(maxWidth: .infinity, maxHeight: 340)
                             .accessibilityLabel("保存前の商品画像")
+                    }
+                    if candidates.count > 1 {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("画像候補")
+                                .font(.subheadline.weight(.semibold))
+                            ScrollView(.horizontal) {
+                                HStack(spacing: 12) {
+                                    ForEach(candidates) { candidate in
+                                        Button {
+                                            selectedCandidateID = candidate.id
+                                            imageData = candidate.data
+                                            sourceImageData = candidate.data
+                                            isManualImage = false
+                                            isCropped = false
+                                        } label: {
+                                            if let image = UIImage(data: candidate.data) {
+                                                Image(uiImage: image)
+                                                    .resizable()
+                                                    .scaledToFill()
+                                                    .frame(width: 72, height: 72)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                                    .overlay {
+                                                        RoundedRectangle(cornerRadius: 10)
+                                                            .stroke(selectedCandidateID == candidate.id && !isManualImage
+                                                                    ? Color.primary : Color.clear, lineWidth: 2)
+                                                    }
+                                            }
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel("画像候補、\(candidate.source)")
+                                        .accessibilityAddTraits(selectedCandidateID == candidate.id && !isManualImage
+                                                                ? .isSelected : [])
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Button("トリミング", systemImage: "crop") {
                         showingCrop = true
@@ -310,6 +355,10 @@ private struct ProductImageReviewSheet: View {
                 Text(errorMessage ?? "")
             }
         }
+    }
+
+    private var selectedCandidate: ProductImageCandidate? {
+        candidates.first { $0.id == selectedCandidateID }
     }
 
     @MainActor
@@ -465,7 +514,7 @@ private struct ProductForm: View {
             }
             .sheet(item: $imageReview) { review in
                 ProductImageReviewSheet(
-                    image: review.image,
+                    candidates: review.candidates,
                     saveAfterReview: review.saveAfterReview,
                     onAccept: { reviewedImage in
                         imageReview = nil
@@ -519,18 +568,13 @@ private struct ProductForm: View {
         guard !isLoadingImage, let url = validPurchaseURL else { return }
         isLoadingImage = true
         defer { isLoadingImage = false }
-        do {
-            let fetchedImage = try await ProductImageFetcher.fetch(from: url)
-            guard validPurchaseURL == url else { return }
-            guard let image = fetchedImage else {
-                showImageFetchFailure(saveAfterReview: saveAfterReview)
-                return
-            }
-            imageReview = ProductImageReview(image: image, saveAfterReview: saveAfterReview)
-        } catch {
-            guard validPurchaseURL == url else { return }
+        let candidates = await ProductImageFetcher.fetchCandidates(from: url)
+        guard validPurchaseURL == url else { return }
+        guard !candidates.isEmpty else {
             showImageFetchFailure(saveAfterReview: saveAfterReview)
+            return
         }
+        imageReview = ProductImageReview(candidates: candidates, saveAfterReview: saveAfterReview)
     }
 
     private func showImageFetchFailure(saveAfterReview: Bool) {
