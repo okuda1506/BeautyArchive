@@ -609,18 +609,11 @@ private struct HomeView: View {
 
     private var header: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("B/ONE")
-                    .font(BOneTypography.brand)
-                    .minimumScaleFactor(0.8)
-                    .lineLimit(1)
-                    .accessibilityAddTraits(.isHeader)
-
-                Text("記録する。整える。もっと、いい自分へ。")
-                    .font(.caption)
-                    .tracking(0.5)
-                    .foregroundStyle(.secondary)
-            }
+            Text("B/ONE")
+                .font(BOneTypography.brand)
+                .minimumScaleFactor(0.8)
+                .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
 
             Spacer(minLength: 12)
 
