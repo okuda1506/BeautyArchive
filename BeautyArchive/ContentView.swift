@@ -829,7 +829,7 @@ private struct HomeView: View {
 
     private var categorySection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("カテゴリで探す")
+            Text("カテゴリ")
                 .font(BOneTypography.section)
                 .accessibilityAddTraits(.isHeader)
 
