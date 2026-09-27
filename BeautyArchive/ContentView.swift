@@ -26,6 +26,7 @@ struct ContentView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(ReminderTimingSettings.self) private var reminderTiming
     @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
     private let previewActions: [HomeAction]?
@@ -38,6 +39,8 @@ struct ContentView: View {
     @Query private var products: [BeautyProduct]
     @Query private var productUnits: [ProductUnit]
     @State private var selectedTab: AppTab = .home
+    @State private var draggedTab: AppTab?
+    @Namespace private var tabGlassNamespace
     @State private var selectedVisitID: UUID?
     @State private var selectedProductID: UUID?
     @State private var showingSettings = false
@@ -190,59 +193,83 @@ struct ContentView: View {
     }
 
     private var bottomNavigation: some View {
-        HStack(spacing: 0) {
-            tabButton(.home, title: "ホーム", symbol: "house", selectedSymbol: "house.fill")
-            tabButton(.archive, title: "記録", symbol: "square.text.square", selectedSymbol: "square.text.square.fill")
-            Menu {
-                Button("美容院の記録", systemImage: "square.and.pencil") {
-                    addDestination = .visit
-                }
-                if !visits.isEmpty {
-                    Button("前回から美容院の記録", systemImage: "doc.on.doc") {
-                        addDestination = .copiedVisit
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                tabButton(.home, title: "ホーム", symbol: "house", selectedSymbol: "house.fill")
+                tabButton(.archive, title: "記録", symbol: "square.text.square", selectedSymbol: "square.text.square.fill")
+                Menu {
+                    Button("美容院の記録", systemImage: "square.and.pencil") {
+                        addDestination = .visit
                     }
-                }
-                Button("商品", systemImage: "bag") {
-                    addDestination = .product
-                }
-                Divider()
-                Button("美容院の予定", systemImage: "scissors") {
-                    addDestination = .salonAppointment
-                }
-                Button("購入予定", systemImage: "calendar.badge.plus") {
-                    addDestination = .purchasePlan
-                }
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 28, weight: .light))
-                    .foregroundStyle(Color(uiColor: .label))
-                    .frame(width: 60, height: 60)
-                    .glassEffect(.regular.tint(.gray.opacity(0.38)).interactive(), in: Circle())
-                    .overlay {
-                        Circle().fill(
-                            RadialGradient(
-                                colors: [.white.opacity(0.28), .white.opacity(0.04), .clear],
-                                center: .init(x: 0.25, y: 0.18),
-                                startRadius: 0,
-                                endRadius: 52
+                    if !visits.isEmpty {
+                        Button("前回から美容院の記録", systemImage: "doc.on.doc") {
+                            addDestination = .copiedVisit
+                        }
+                    }
+                    Button("商品", systemImage: "bag") {
+                        addDestination = .product
+                    }
+                    Divider()
+                    Button("美容院の予定", systemImage: "scissors") {
+                        addDestination = .salonAppointment
+                    }
+                    Button("購入予定", systemImage: "calendar.badge.plus") {
+                        addDestination = .purchasePlan
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundStyle(Color(uiColor: .label))
+                        .frame(width: 60, height: 60)
+                        .glassEffect(.regular.tint(.gray.opacity(0.38)).interactive(), in: Circle())
+                        .overlay {
+                            Circle().fill(
+                                RadialGradient(
+                                    colors: [.white.opacity(0.28), .white.opacity(0.04), .clear],
+                                    center: .init(x: 0.25, y: 0.18),
+                                    startRadius: 0,
+                                    endRadius: 52
+                                )
                             )
-                        )
-                        .allowsHitTesting(false)
-                    }
-                    .overlay {
-                        Circle().strokeBorder(.white.opacity(0.5), lineWidth: 1)
                             .allowsHitTesting(false)
-                    }
-                    .shadow(color: .black.opacity(0.18), radius: 10, y: 5)
+                        }
+                        .overlay {
+                            Circle().strokeBorder(.white.opacity(0.5), lineWidth: 1)
+                                .allowsHitTesting(false)
+                        }
+                        .shadow(color: .black.opacity(0.18), radius: 10, y: 5)
+                }
+                .frame(maxWidth: .infinity)
+                .tint(Color(uiColor: .label))
+                .accessibilityLabel("追加")
+                tabButton(.calendar, title: "カレンダー", symbol: "calendar", selectedSymbol: "calendar")
+                tabButton(.items, title: "アイテム", symbol: "bag", selectedSymbol: "bag.fill")
             }
-            .frame(maxWidth: .infinity)
-            .tint(Color(uiColor: .label))
-            .accessibilityLabel("追加")
-            tabButton(.calendar, title: "カレンダー", symbol: "calendar", selectedSymbol: "calendar")
-            tabButton(.items, title: "アイテム", symbol: "bag", selectedSymbol: "bag.fill")
+            .frame(height: 68)
+            .padding(.horizontal, 8)
+            .contentShape(Capsule())
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 12)
+                    .onChanged { value in
+                        guard abs(value.translation.width) > abs(value.translation.height),
+                              tab(at: value.startLocation.x, barWidth: geometry.size.width) != nil,
+                              let tab = tab(at: value.location.x, barWidth: geometry.size.width)
+                        else { return }
+                        draggedTab = tab
+                    }
+                    .onEnded { value in
+                        if abs(value.translation.width) > abs(value.translation.height),
+                           tab(at: value.startLocation.x, barWidth: geometry.size.width) != nil {
+                            selectedTab = tab(at: value.location.x, barWidth: geometry.size.width)
+                                ?? draggedTab ?? selectedTab
+                        }
+                        draggedTab = nil
+                    }
+            )
+            .animation(reduceMotion ? nil : .interactiveSpring(response: 0.38, dampingFraction: 0.8),
+                       value: highlightedTab)
         }
         .frame(height: 68)
-        .padding(.horizontal, 8)
         .glassEffect(.regular.tint(Color(uiColor: .systemGray3).opacity(0.32)), in: Capsule())
         .overlay {
             Capsule().strokeBorder(
@@ -266,16 +293,41 @@ struct ContentView: View {
     ) -> some View {
         Button {
             selectedTab = tab
+            draggedTab = nil
         } label: {
-            Image(systemName: selectedTab == tab ? selectedSymbol : symbol)
-                .font(.system(size: 21, weight: .regular))
-                .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary)
-                .frame(maxWidth: .infinity, minHeight: 58)
-                .contentShape(Rectangle())
+            ZStack {
+                if highlightedTab == tab {
+                    Color.clear
+                        .frame(width: 54, height: 54)
+                        .glassEffect(.regular.tint(Color(uiColor: .systemGray3).opacity(0.2)),
+                                     in: Circle())
+                        .matchedGeometryEffect(id: "selected-tab-glass", in: tabGlassNamespace)
+                }
+                Image(systemName: highlightedTab == tab ? selectedSymbol : symbol)
+                    .font(.system(size: 21, weight: .regular))
+                    .foregroundStyle(highlightedTab == tab ? Color.primary : Color.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
         .accessibilityValue(selectedTab == tab ? "選択中" : "")
+    }
+
+    private var highlightedTab: AppTab { draggedTab ?? selectedTab }
+
+    private func tab(at location: CGFloat, barWidth: CGFloat) -> AppTab? {
+        let slotWidth = (barWidth - 16) / 5
+        guard slotWidth > 0 else { return nil }
+        let slot = min(4, max(0, Int((location - 8) / slotWidth)))
+        switch slot {
+        case 0: return .home
+        case 1: return .archive
+        case 3: return .calendar
+        case 4: return .items
+        default: return nil // The center slot is the add menu, not a tab.
+        }
     }
 
     @MainActor
