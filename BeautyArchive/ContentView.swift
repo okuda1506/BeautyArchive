@@ -796,32 +796,15 @@ private struct HomeView: View {
                 .accessibilityAddTraits(.isHeader)
 
             HStack(alignment: .top, spacing: 8) {
-                category("Hair", imageData: latestSalonPhotoData, symbol: "scissors", tab: .archive)
-                category("Cosmetics", imageData: latestProductPhotoData(in: .cosmetics),
-                         symbol: "bag", tab: .items)
-                category("Fragrance", imageData: latestProductPhotoData(in: .fragrance),
-                         symbol: "sparkles", tab: .items)
+                category("Hair", imageName: "HomeCategoryHair", tab: .archive)
+                category("Cosmetics", imageName: "HomeCategoryCosmetics", tab: .items)
+                category("Fragrance", imageName: "HomeCategoryFragrance", tab: .items)
             }
         }
-    }
-
-    private var latestSalonPhotoData: Data? {
-        for visit in visits.sorted(by: { $0.date > $1.date }) {
-            if let photo = salonPhotos.filter({ $0.visitID == visit.id })
-                .min(by: { $0.sortOrder < $1.sortOrder }), !photo.imageData.isEmpty {
-                return photo.imageData
-            }
-        }
-        return nil
-    }
-
-    private func latestProductPhotoData(in category: ProductCategory) -> Data? {
-        products.filter { $0.category == category && !$0.imageData.isEmpty }
-            .max(by: { $0.updatedAt < $1.updatedAt })?.imageData
     }
 
     private func category(
-        _ title: String, imageData: Data?, symbol: String, tab: AppTab
+        _ title: String, imageName: String, tab: AppTab
     ) -> some View {
         Button {
             selectedTab = tab
@@ -829,18 +812,12 @@ private struct HomeView: View {
             VStack(alignment: .leading, spacing: 8) {
                 ZStack {
                     Color(uiColor: .tertiarySystemGroupedBackground)
-                    if let imageData, let image = UIImage(data: imageData) {
-                        GeometryReader { geometry in
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: geometry.size.width, height: geometry.size.height)
-                                .clipped()
-                        }
-                    } else {
-                        Image(systemName: symbol)
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
+                    GeometryReader { geometry in
+                        Image(imageName)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .clipped()
                     }
                 }
                 .frame(height: 82)
