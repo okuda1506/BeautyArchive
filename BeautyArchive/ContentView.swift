@@ -26,7 +26,6 @@ struct ContentView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(ReminderTimingSettings.self) private var reminderTiming
     @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
     private let previewActions: [HomeAction]?
@@ -39,8 +38,6 @@ struct ContentView: View {
     @Query private var products: [BeautyProduct]
     @Query private var productUnits: [ProductUnit]
     @State private var selectedTab: AppTab = .home
-    @State private var draggedTab: AppTab?
-    @State private var draggedIndicatorX: CGFloat?
     @State private var selectedVisitID: UUID?
     @State private var selectedProductID: UUID?
     @State private var showingSettings = false
@@ -141,7 +138,11 @@ struct ContentView: View {
 
         }
         .tint(.primary)
-        .safeAreaInset(edge: .bottom, spacing: 0) { bottomNavigation }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            BottomNavigationBar(selectedTab: $selectedTab, canCopyVisit: !visits.isEmpty) {
+                addDestination = $0
+            }
+        }
         .sheet(item: $addDestination) { destination in
             switch destination {
             case .visit:
@@ -192,171 +193,6 @@ struct ContentView: View {
         }
     }
 
-    private var bottomNavigation: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .topLeading) {
-                Color.clear
-                    .frame(width: 54, height: 54)
-                    .glassEffect(.regular.tint(Color(uiColor: .systemGray3).opacity(0.2)),
-                                 in: Circle())
-                    .offset(x: (draggedIndicatorX ?? tabCenter(selectedTab, barWidth: geometry.size.width)) - 27,
-                            y: 7)
-                    .allowsHitTesting(false)
-
-                HStack(spacing: 0) {
-                    tabButton(.home, title: "ホーム", symbol: "house", selectedSymbol: "house.fill",
-                              barWidth: geometry.size.width)
-                    tabButton(.archive, title: "記録", symbol: "square.text.square",
-                              selectedSymbol: "square.text.square.fill", barWidth: geometry.size.width)
-                    addMenu
-                    tabButton(.calendar, title: "カレンダー", symbol: "calendar", selectedSymbol: "calendar",
-                              barWidth: geometry.size.width)
-                    tabButton(.items, title: "アイテム", symbol: "bag", selectedSymbol: "bag.fill",
-                              barWidth: geometry.size.width)
-                }
-                .frame(height: 68)
-                .padding(.horizontal, 8)
-            }
-            .frame(height: 68)
-            .coordinateSpace(name: "bottomNavigation")
-            .animation(tabAnimation, value: selectedTab)
-        }
-        .frame(height: 68)
-        .glassEffect(.regular.tint(Color(uiColor: .systemGray3).opacity(0.32)), in: Capsule())
-        .overlay {
-            Capsule().strokeBorder(
-                LinearGradient(
-                    colors: [.white.opacity(0.55), .white.opacity(0.12), .white.opacity(0.32)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
-            )
-            .allowsHitTesting(false)
-        }
-        .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
-        .padding(.horizontal, 16)
-        .padding(.top, 6)
-        .padding(.bottom, 4)
-    }
-
-    private var addMenu: some View {
-        Menu {
-            Button("美容院の記録", systemImage: "square.and.pencil") {
-                addDestination = .visit
-            }
-            if !visits.isEmpty {
-                Button("前回から美容院の記録", systemImage: "doc.on.doc") {
-                    addDestination = .copiedVisit
-                }
-            }
-            Button("商品", systemImage: "bag") {
-                addDestination = .product
-            }
-            Divider()
-            Button("美容院の予定", systemImage: "scissors") {
-                addDestination = .salonAppointment
-            }
-            Button("購入予定", systemImage: "calendar.badge.plus") {
-                addDestination = .purchasePlan
-            }
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 28, weight: .light))
-                .foregroundStyle(Color(uiColor: .label))
-                .frame(width: 60, height: 60)
-                .glassEffect(.regular.tint(.gray.opacity(0.38)).interactive(), in: Circle())
-                .overlay {
-                    Circle().fill(
-                        RadialGradient(
-                            colors: [.white.opacity(0.28), .white.opacity(0.04), .clear],
-                            center: .init(x: 0.25, y: 0.18),
-                            startRadius: 0,
-                            endRadius: 52
-                        )
-                    )
-                    .allowsHitTesting(false)
-                }
-                .overlay {
-                    Circle().strokeBorder(.white.opacity(0.5), lineWidth: 1)
-                        .allowsHitTesting(false)
-                }
-                .shadow(color: .black.opacity(0.18), radius: 10, y: 5)
-        }
-        .frame(maxWidth: .infinity)
-        .tint(Color(uiColor: .label))
-        .accessibilityLabel("追加")
-    }
-
-    private func tabButton(
-        _ tab: AppTab, title: String, symbol: String, selectedSymbol: String, barWidth: CGFloat
-    ) -> some View {
-        Button {
-            withAnimation(tabAnimation) { selectedTab = tab }
-        } label: {
-            Image(systemName: highlightedTab == tab ? selectedSymbol : symbol)
-                .font(.system(size: 21, weight: .regular))
-                .foregroundStyle(highlightedTab == tab ? Color.primary : Color.secondary)
-                .frame(maxWidth: .infinity, minHeight: 58)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .highPriorityGesture(
-            DragGesture(minimumDistance: 0, coordinateSpace: .named("bottomNavigation"))
-                .onChanged { value in
-                    guard abs(value.translation.width) > 4,
-                          abs(value.translation.width) > abs(value.translation.height)
-                    else { return }
-                    let first = tabCenter(.home, barWidth: barWidth)
-                    let last = tabCenter(.items, barWidth: barWidth)
-                    let position = min(last, max(first, value.location.x))
-                    // Track the finger directly; only the release should spring to a tab.
-                    draggedIndicatorX = position
-                    draggedTab = nearestTab(to: position, barWidth: barWidth)
-                }
-                .onEnded { value in
-                    let destination: AppTab
-                    if abs(value.translation.width) > 4,
-                       abs(value.translation.width) > abs(value.translation.height) {
-                        destination = nearestTab(to: value.location.x, barWidth: barWidth)
-                    } else {
-                        destination = tab
-                    }
-                    withAnimation(tabAnimation) {
-                        selectedTab = destination
-                        draggedIndicatorX = nil
-                        draggedTab = nil
-                    }
-                }
-        )
-        .accessibilityLabel(title)
-        .accessibilityValue(selectedTab == tab ? "選択中" : "")
-    }
-
-    private var highlightedTab: AppTab { draggedTab ?? selectedTab }
-
-    private var tabAnimation: Animation? {
-        reduceMotion ? nil : .spring(response: 0.36, dampingFraction: 0.82)
-    }
-
-    private func tabCenter(_ tab: AppTab, barWidth: CGFloat) -> CGFloat {
-        let slot: CGFloat
-        switch tab {
-        case .home: slot = 0
-        case .archive: slot = 1
-        case .calendar: slot = 3
-        case .items: slot = 4
-        }
-        return 8 + (barWidth - 16) / 5 * (slot + 0.5)
-    }
-
-    private func nearestTab(to position: CGFloat, barWidth: CGFloat) -> AppTab {
-        [.home, .archive, .calendar, .items].min {
-            abs(tabCenter($0, barWidth: barWidth) - position)
-                < abs(tabCenter($1, barWidth: barWidth) - position)
-        } ?? .home
-    }
-
     @MainActor
     private func syncPendingGoogleAppointments() async {
         guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1",
@@ -402,6 +238,208 @@ struct ContentView: View {
             }
         }
     }
+}
+
+private struct BottomNavigationBar: View {
+    @Binding var selectedTab: AppTab
+    let canCopyVisit: Bool
+    let onAdd: (AddDestination) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var draggedTab: AppTab?
+    @State private var draggedIndicatorX: CGFloat?
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .topLeading) {
+                addGlass
+                    .offset(x: geometry.size.width / 2 - 30, y: 4)
+
+                Color.clear
+                    .frame(width: 54, height: 54)
+                    .glassEffect(.clear, in: Circle())
+                    .overlay {
+                        Circle().strokeBorder(
+                            LinearGradient(
+                                colors: [.white.opacity(0.85), .white.opacity(0.18), .white.opacity(0.65)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.25
+                        )
+                    }
+                    .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
+                    .offset(x: (draggedIndicatorX ?? tabCenter(selectedTab, barWidth: geometry.size.width)) - 27,
+                            y: 7)
+                    .allowsHitTesting(false)
+
+                HStack(spacing: 0) {
+                    tabButton(.home, title: "ホーム", symbol: "house", selectedSymbol: "house.fill")
+                    tabButton(.archive, title: "記録", symbol: "square.text.square",
+                              selectedSymbol: "square.text.square.fill")
+                    addMenu
+                    tabButton(.calendar, title: "カレンダー", symbol: "calendar", selectedSymbol: "calendar")
+                    tabButton(.items, title: "アイテム", symbol: "bag", selectedSymbol: "bag.fill")
+                }
+                .frame(height: 68)
+                .padding(.horizontal, 8)
+                .contentShape(Capsule())
+                .highPriorityGesture(tabDragGesture(barWidth: geometry.size.width))
+            }
+            .frame(height: 68)
+            .coordinateSpace(name: "bottomNavigation")
+            .animation(tabAnimation, value: selectedTab)
+        }
+        .frame(height: 68)
+        .glassEffect(.regular, in: Capsule())
+        .overlay {
+            Capsule().strokeBorder(
+                LinearGradient(
+                    colors: [.white.opacity(0.55), .white.opacity(0.12), .white.opacity(0.32)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+            .allowsHitTesting(false)
+        }
+        .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
+    }
+
+    private var addGlass: some View {
+        Color.clear
+            .frame(width: 60, height: 60)
+            .glassEffect(.regular.tint(.gray.opacity(0.38)), in: Circle())
+            .overlay {
+                Circle().fill(
+                    RadialGradient(
+                        colors: [.white.opacity(0.28), .white.opacity(0.04), .clear],
+                        center: .init(x: 0.25, y: 0.18),
+                        startRadius: 0,
+                        endRadius: 52
+                    )
+                )
+            }
+            .overlay {
+                Circle().strokeBorder(.white.opacity(0.5), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.18), radius: 10, y: 5)
+            .allowsHitTesting(false)
+    }
+
+    private var addMenu: some View {
+        Menu {
+            Button("美容院の記録", systemImage: "square.and.pencil") {
+                onAdd(.visit)
+            }
+            if canCopyVisit {
+                Button("前回から美容院の記録", systemImage: "doc.on.doc") {
+                    onAdd(.copiedVisit)
+                }
+            }
+            Button("商品", systemImage: "bag") {
+                onAdd(.product)
+            }
+            Divider()
+            Button("美容院の予定", systemImage: "scissors") {
+                onAdd(.salonAppointment)
+            }
+            Button("購入予定", systemImage: "calendar.badge.plus") {
+                onAdd(.purchasePlan)
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(Color(uiColor: .label))
+                .frame(width: 60, height: 60)
+                .contentShape(Circle())
+        }
+        .frame(maxWidth: .infinity)
+        .tint(Color(uiColor: .label))
+        .accessibilityLabel("追加")
+    }
+
+    private func tabButton(
+        _ tab: AppTab, title: String, symbol: String, selectedSymbol: String
+    ) -> some View {
+        Button {
+            withAnimation(tabAnimation) { selectedTab = tab }
+        } label: {
+            Image(systemName: highlightedTab == tab ? selectedSymbol : symbol)
+                .font(.system(size: 21, weight: .regular))
+                .foregroundStyle(highlightedTab == tab ? Color.primary : Color.secondary)
+                .frame(maxWidth: .infinity, minHeight: 58)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(selectedTab == tab ? "選択中" : "")
+    }
+
+    private func tabDragGesture(barWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .named("bottomNavigation"))
+            .onChanged { value in
+                guard tab(at: value.startLocation.x, barWidth: barWidth) != nil,
+                      abs(value.translation.width) > abs(value.translation.height)
+                else { return }
+                let first = tabCenter(.home, barWidth: barWidth)
+                let last = tabCenter(.items, barWidth: barWidth)
+                let position = min(last, max(first, value.location.x))
+                // Follow the finger without animating each drag update.
+                draggedIndicatorX = position
+                draggedTab = nearestTab(to: position, barWidth: barWidth)
+            }
+            .onEnded { value in
+                guard tab(at: value.startLocation.x, barWidth: barWidth) != nil else { return }
+                let destination = abs(value.translation.width) > abs(value.translation.height)
+                    ? nearestTab(to: value.location.x, barWidth: barWidth)
+                    : selectedTab
+                withAnimation(tabAnimation) {
+                    selectedTab = destination
+                    draggedIndicatorX = nil
+                    draggedTab = nil
+                }
+            }
+    }
+
+    private var highlightedTab: AppTab { draggedTab ?? selectedTab }
+
+    private var tabAnimation: Animation? {
+        reduceMotion ? nil : .spring(response: 0.36, dampingFraction: 0.82)
+    }
+
+    private func tabCenter(_ tab: AppTab, barWidth: CGFloat) -> CGFloat {
+        let slot: CGFloat
+        switch tab {
+        case .home: slot = 0
+        case .archive: slot = 1
+        case .calendar: slot = 3
+        case .items: slot = 4
+        }
+        return 8 + (barWidth - 16) / 5 * (slot + 0.5)
+    }
+
+    private func nearestTab(to position: CGFloat, barWidth: CGFloat) -> AppTab {
+        [.home, .archive, .calendar, .items].min {
+            abs(tabCenter($0, barWidth: barWidth) - position)
+                < abs(tabCenter($1, barWidth: barWidth) - position)
+        } ?? .home
+    }
+
+    private func tab(at position: CGFloat, barWidth: CGFloat) -> AppTab? {
+        let slotWidth = (barWidth - 16) / 5
+        guard slotWidth > 0 else { return nil }
+        switch Int((position - 8) / slotWidth) {
+        case 0: return .home
+        case 1: return .archive
+        case 3: return .calendar
+        case 4: return .items
+        default: return nil
+        }
+    }
+
 }
 
 private struct HomeView: View {
