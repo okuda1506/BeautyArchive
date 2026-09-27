@@ -1,35 +1,37 @@
 import SwiftUI
 
 struct HomeItemsSection: View {
+    let category: ProductCategory
     let products: [BeautyProduct]
     let units: [ProductUnit]
     let onSelectProduct: (UUID) -> Void
     let onShowAll: () -> Void
 
     var body: some View {
+        let categoryProducts = sortedProducts(in: category)
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
-                Text("化粧品・香水")
+                Text(category.title)
                     .font(.title2.bold())
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
-                if !products.isEmpty {
+                if !categoryProducts.isEmpty {
                     Button("すべて見る", systemImage: "chevron.right", action: onShowAll)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            if products.isEmpty {
+            if categoryProducts.isEmpty {
                 Button(action: onShowAll) {
                     HStack(spacing: 14) {
-                        Image(systemName: "bag")
+                        Image(systemName: category == .fragrance ? "sparkles" : "bag")
                             .font(.title2)
                             .frame(width: 48, height: 48)
                             .background(Color(uiColor: .tertiarySystemGroupedBackground))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("アイテムはまだありません")
+                            Text("\(category.title)はまだありません")
                                 .font(.headline)
                             Text("アイテムを開いて登録する")
                                 .font(.subheadline)
@@ -47,31 +49,16 @@ struct HomeItemsSection: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                ForEach(ProductCategory.allCases) { category in
-                    let categoryProducts = sortedProducts(in: category)
-                    if !categoryProducts.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text(category.title)
-                                    .font(.subheadline.weight(.semibold))
-                                Spacer()
-                                Text("\(categoryProducts.count)件")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            VStack(spacing: 0) {
-                                ForEach(Array(categoryProducts.prefix(2))) { product in
-                                    if product.id != categoryProducts.first?.id {
-                                        Divider().padding(.leading, 76)
-                                    }
-                                    productRow(product)
-                                }
-                            }
-                            .background(Color(uiColor: .secondarySystemGroupedBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                VStack(spacing: 0) {
+                    ForEach(Array(categoryProducts.prefix(2))) { product in
+                        if product.id != categoryProducts.first?.id {
+                            Divider().padding(.leading, 76)
                         }
+                        productRow(product)
                     }
                 }
+                .background(Color(uiColor: .secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
         }
     }
