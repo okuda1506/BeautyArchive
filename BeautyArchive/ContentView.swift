@@ -494,14 +494,15 @@ private struct HomeView: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("B/ONE")
-                    .font(.system(size: 34, weight: .regular, design: .serif))
+                    .font(BOneTypography.brand)
                     .minimumScaleFactor(0.8)
                     .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
 
                 Text("記録する。整える。もっと、いい自分へ。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .tracking(0.5)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 12)
@@ -511,9 +512,12 @@ private struct HomeView: View {
             } label: {
                 Image(systemName: "gearshape")
                     .font(.title3)
+                    .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .contentShape(Circle())
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.plain)
             .accessibilityLabel("設定")
         }
     }
@@ -523,7 +527,7 @@ private struct HomeView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     Text("ヘアメンテナンス")
-                        .font(.subheadline.weight(.semibold))
+                        .font(BOneTypography.eyebrow)
                         .accessibilityAddTraits(.isHeader)
                     Spacer()
                     if actions.count > 1 || (hairActions.isEmpty && !actions.isEmpty) {
@@ -549,13 +553,10 @@ private struct HomeView: View {
                             maintenancePhoto(for: action)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Hair")
-                                    .font(.caption.weight(.semibold))
+                                    .font(BOneTypography.eyebrow)
                                 Text(maintenanceStatus(for: action))
-                                    .font(.system(
-                                        size: action.daysUntil(referenceDate: .now, calendar: calendar) < 0
-                                            ? 20 : 28,
-                                        weight: .semibold, design: .rounded
-                                    ))
+                                    .font(action.daysUntil(referenceDate: .now, calendar: calendar) < 0
+                                        ? BOneTypography.compactCountdown : BOneTypography.countdown)
                                     .monospacedDigit()
                                 Text(action.title)
                                     .font(.subheadline)
@@ -588,7 +589,7 @@ private struct HomeView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("次のヘアメンテナンスはありません")
-                                    .font(.headline)
+                                    .font(BOneTypography.rowTitle)
                                 Text("記録を追加すると目安を確認できます")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -651,7 +652,7 @@ private struct HomeView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(action.title)
-                            .font(.headline)
+                            .font(BOneTypography.rowTitle)
                             .foregroundStyle(.primary)
                         Text(dateSummary(for: action))
                             .font(.subheadline)
@@ -712,7 +713,7 @@ private struct HomeView: View {
     private var categorySection: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("カテゴリ")
-                .font(.title2.bold())
+                .font(BOneTypography.section)
                 .accessibilityAddTraits(.isHeader)
 
             HStack(alignment: .top, spacing: 8) {
@@ -767,7 +768,7 @@ private struct HomeView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .accessibilityHidden(true)
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .font(.caption.weight(.medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }

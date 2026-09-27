@@ -90,7 +90,7 @@ struct ProductListView: View {
                                                         .accessibilityHidden(true)
                                                 }
                                                 VStack(alignment: .leading, spacing: 4) {
-                                                    Text(product.name).font(.headline)
+                                                    Text(product.name).font(BOneTypography.rowTitle)
                                                     if !product.brand.isEmpty {
                                                         Text(product.brand)
                                                             .font(.subheadline)
@@ -226,7 +226,7 @@ private struct ProductDetail: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(unit.status.title)
-                                    .font(.headline)
+                                    .font(BOneTypography.rowTitle)
                                 if let purchasedAt = unit.purchasedAt {
                                     Text(purchasedAt, format: .dateTime.year().month().day())
                                         .font(.subheadline)

@@ -12,7 +12,7 @@ struct HomeItemsSection: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
                 Text(category.title)
-                    .font(.title2.bold())
+                    .font(BOneTypography.section)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 if !categoryProducts.isEmpty {
@@ -32,7 +32,7 @@ struct HomeItemsSection: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(category.title)はまだありません")
-                                .font(.headline)
+                                .font(BOneTypography.rowTitle)
                             Text("アイテムを開いて登録する")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
@@ -102,7 +102,7 @@ struct HomeItemsSection: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(product.name)
-                        .font(.headline)
+                        .font(BOneTypography.rowTitle)
                         .foregroundStyle(.primary)
                     if !product.brand.isEmpty {
                         Text(product.brand)
