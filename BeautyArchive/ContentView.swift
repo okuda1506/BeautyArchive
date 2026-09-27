@@ -237,6 +237,9 @@ private struct HomeView: View {
     @Environment(\.openURL) private var openURL
     @State private var showingAllActions = false
     @State private var showingAddVisit = false
+    @State private var showingAddProduct = false
+    @State private var showingAddSalonAppointment = false
+    @State private var showingAddPurchasePlan = false
     @State private var showingPreparation = false
     @State private var pendingPreparation = false
     @State private var editingAppointment: BeautyAppointment?
@@ -310,6 +313,9 @@ private struct HomeView: View {
                     }
                 )
             }
+            .sheet(isPresented: $showingAddProduct) { ProductForm() }
+            .sheet(isPresented: $showingAddSalonAppointment) { AppointmentForm() }
+            .sheet(isPresented: $showingAddPurchasePlan) { PurchasePlanForm() }
             .sheet(item: $editingDueAction) { action in
                 dueDateEditor(for: action)
             }
@@ -362,16 +368,28 @@ private struct HomeView: View {
 
             Spacer(minLength: 12)
 
-            Button {
-                completingAppointment = nil
-                showingAddVisit = true
+            Menu {
+                Button("美容院の記録", systemImage: "square.and.pencil") {
+                    completingAppointment = nil
+                    showingAddVisit = true
+                }
+                Button("商品", systemImage: "bag") {
+                    showingAddProduct = true
+                }
+                Divider()
+                Button("美容院の予定", systemImage: "scissors") {
+                    showingAddSalonAppointment = true
+                }
+                Button("購入予定", systemImage: "calendar.badge.plus") {
+                    showingAddPurchasePlan = true
+                }
             } label: {
                 Image(systemName: "plus")
                     .font(.title3.weight(.medium))
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.glass)
-            .accessibilityLabel("記録を追加")
+            .accessibilityLabel("追加")
         }
     }
 

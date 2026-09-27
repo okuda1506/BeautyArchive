@@ -387,7 +387,7 @@ private struct ProductImageReviewSheet: View {
     }
 }
 
-private struct ProductForm: View {
+struct ProductForm: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     let product: BeautyProduct?

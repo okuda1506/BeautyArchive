@@ -107,6 +107,8 @@ The planned initial release includes:
 
 The product image review also supports square cropping with drag and zoom controls before the image is saved.
 
+The Home add menu opens salon records, products, salon appointments, and purchase plans.
+
 **Still planned:** iCloud sync is configured but has not been verified across devices. Google write-back across multiple devices also needs real-world validation. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
 
 ## Tech Stack
