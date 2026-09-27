@@ -111,6 +111,8 @@ The Home add menu opens salon records, products, salon appointments, and purchas
 
 Creating a salon visit from the previous record carries over the salon, stylist, booking URL, treatments, and their cycle lengths. The date, photos, and impressions remain specific to the new visit.
 
+The item list supports name and brand search plus filters for in-use, unopened, and ended products.
+
 **Still planned:** iCloud sync is configured but has not been verified across devices. Google write-back across multiple devices also needs real-world validation. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
 
 ## Tech Stack
