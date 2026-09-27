@@ -5,6 +5,8 @@ import UIKit
 import UserNotifications
 
 struct SettingsView: View {
+    var showCloseButton = false
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
@@ -135,6 +137,13 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("設定")
+            .toolbar {
+                if showCloseButton {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("閉じる") { dismiss() }
+                    }
+                }
+            }
             .task { await refreshAuthorization() }
             .task { await refreshICloudStatus() }
             .task { await refreshGoogleAccount() }

@@ -6,7 +6,16 @@ private enum AppTab: Hashable {
     case archive
     case calendar
     case items
-    case settings
+}
+
+private enum AddDestination: String, Identifiable {
+    case visit
+    case copiedVisit
+    case product
+    case salonAppointment
+    case purchasePlan
+
+    var id: String { rawValue }
 }
 
 struct ContentView: View {
@@ -31,6 +40,8 @@ struct ContentView: View {
     @State private var selectedTab: AppTab = .home
     @State private var selectedVisitID: UUID?
     @State private var selectedProductID: UUID?
+    @State private var showingSettings = false
+    @State private var addDestination: AddDestination?
     @State private var notificationTask: Task<Void, Never>?
     @State private var contentAlert: ContentAlert?
 
@@ -83,6 +94,7 @@ struct ContentView: View {
                 HomeView(
                     actions: actions,
                     visits: visits,
+                    salonPhotos: photos,
                     salonTreatments: treatments,
                     appointments: appointments,
                     appointmentTreatments: appointmentTreatments,
@@ -91,8 +103,10 @@ struct ContentView: View {
                     productUnits: productUnits,
                     selectedTab: $selectedTab,
                     selectedVisitID: $selectedVisitID,
-                    selectedProductID: $selectedProductID
+                    selectedProductID: $selectedProductID,
+                    showingSettings: $showingSettings
                 )
+                .toolbar(.hidden, for: .tabBar)
             } label: {
                 Image(systemName: "house.fill")
                     .accessibilityLabel("ホーム")
@@ -100,6 +114,7 @@ struct ContentView: View {
 
             Tab(value: AppTab.archive) {
                 SalonArchiveView(selectedVisitID: $selectedVisitID)
+                    .toolbar(.hidden, for: .tabBar)
             } label: {
                 Image(systemName: "square.text.square")
                     .accessibilityLabel("記録")
@@ -107,6 +122,7 @@ struct ContentView: View {
 
             Tab(value: AppTab.calendar) {
                 AppointmentListView()
+                    .toolbar(.hidden, for: .tabBar)
             } label: {
                 Image(systemName: "calendar")
                     .accessibilityLabel("予定")
@@ -114,19 +130,36 @@ struct ContentView: View {
 
             Tab(value: AppTab.items) {
                 ProductListView(selectedProductID: $selectedProductID)
+                    .toolbar(.hidden, for: .tabBar)
             } label: {
                 Image(systemName: "bag")
                     .accessibilityLabel("アイテム")
             }
 
-            Tab(value: AppTab.settings) {
-                SettingsView()
-            } label: {
-                Image(systemName: "gearshape")
-                    .accessibilityLabel("設定")
-            }
         }
         .tint(.primary)
+        .safeAreaInset(edge: .bottom, spacing: 0) { bottomNavigation }
+        .sheet(item: $addDestination) { destination in
+            switch destination {
+            case .visit:
+                SalonVisitForm()
+            case .copiedVisit:
+                let latestVisit = visits.max(by: { $0.date < $1.date })
+                SalonVisitForm(
+                    copying: latestVisit,
+                    copyingTreatments: treatments.filter { $0.visitID == latestVisit?.id }
+                )
+            case .product:
+                ProductForm()
+            case .salonAppointment:
+                AppointmentForm()
+            case .purchasePlan:
+                PurchasePlanForm()
+            }
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView(showCloseButton: true)
+        }
         .onAppear { scheduleNotificationReconciliation() }
         .task { await syncPendingGoogleAppointments() }
         .onChange(of: notificationSignature) { _, _ in scheduleNotificationReconciliation() }
@@ -154,6 +187,67 @@ struct ContentView: View {
         } message: {
             Text(contentAlert?.message ?? "")
         }
+    }
+
+    private var bottomNavigation: some View {
+        HStack(spacing: 0) {
+            tabButton(.home, title: "ホーム", symbol: "house", selectedSymbol: "house.fill")
+            tabButton(.archive, title: "記録", symbol: "square.text.square", selectedSymbol: "square.text.square.fill")
+            Menu {
+                Button("美容院の記録", systemImage: "square.and.pencil") {
+                    addDestination = .visit
+                }
+                if !visits.isEmpty {
+                    Button("前回から美容院の記録", systemImage: "doc.on.doc") {
+                        addDestination = .copiedVisit
+                    }
+                }
+                Button("商品", systemImage: "bag") {
+                    addDestination = .product
+                }
+                Divider()
+                Button("美容院の予定", systemImage: "scissors") {
+                    addDestination = .salonAppointment
+                }
+                Button("購入予定", systemImage: "calendar.badge.plus") {
+                    addDestination = .purchasePlan
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundStyle(.white)
+                    .frame(width: 58, height: 58)
+                    .glassEffect(.regular.tint(.gray), in: Circle())
+            }
+            .frame(maxWidth: .infinity)
+            .tint(.white)
+            .accessibilityLabel("追加")
+            tabButton(.calendar, title: "カレンダー", symbol: "calendar", selectedSymbol: "calendar")
+            tabButton(.items, title: "アイテム", symbol: "bag", selectedSymbol: "bag.fill")
+        }
+        .frame(height: 68)
+        .padding(.horizontal, 8)
+        .glassEffect(.regular, in: Capsule())
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
+    }
+
+    private func tabButton(
+        _ tab: AppTab, title: String, symbol: String, selectedSymbol: String
+    ) -> some View {
+        Button {
+            selectedTab = tab
+        } label: {
+            Image(systemName: selectedTab == tab ? selectedSymbol : symbol)
+                .font(.system(size: 21, weight: .regular))
+                .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary)
+                .frame(maxWidth: .infinity, minHeight: 58)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(selectedTab == tab ? "選択中" : "")
     }
 
     @MainActor
@@ -226,6 +320,7 @@ private struct HomeView: View {
     @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
     let actions: [HomeAction]
     let visits: [SalonVisit]
+    let salonPhotos: [SalonPhoto]
     let salonTreatments: [SalonTreatment]
     let appointments: [BeautyAppointment]
     let appointmentTreatments: [AppointmentTreatment]
@@ -235,14 +330,11 @@ private struct HomeView: View {
     @Binding var selectedTab: AppTab
     @Binding var selectedVisitID: UUID?
     @Binding var selectedProductID: UUID?
+    @Binding var showingSettings: Bool
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @State private var showingAllActions = false
     @State private var showingAddVisit = false
-    @State private var copyingFrom: SalonVisit?
-    @State private var showingAddProduct = false
-    @State private var showingAddSalonAppointment = false
-    @State private var showingAddPurchasePlan = false
     @State private var showingPreparation = false
     @State private var pendingPreparation = false
     @State private var editingAppointment: BeautyAppointment?
@@ -258,6 +350,9 @@ private struct HomeView: View {
     @State private var pendingDueAction: HomeAction?
     @State private var editedDueDate = Date.now
 
+    private var hairActions: [HomeAction] {
+        actions.filter { $0.kind != .itemReplacement }
+    }
     private var actionGroups: HomeActionGroups { HomeActionGroups(actions: actions) }
     private var calendar: Calendar { .current }
 
@@ -280,6 +375,21 @@ private struct HomeView: View {
                         )
                     }
                     categorySection
+                    HomeRecentRecordsSection(
+                        visits: visits,
+                        treatments: salonTreatments,
+                        photos: salonPhotos,
+                        products: products,
+                        units: productUnits,
+                        onSelectVisit: { visitID in
+                            selectedVisitID = visitID
+                            selectedTab = .archive
+                        },
+                        onSelectProduct: { productID in
+                            selectedProductID = productID
+                            selectedTab = .items
+                        }
+                    )
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 22)
@@ -313,18 +423,12 @@ private struct HomeView: View {
             }
             .sheet(isPresented: $showingAddVisit) {
                 SalonVisitForm(
-                    copying: completingAppointment == nil ? copyingFrom : nil,
-                    copyingTreatments: completingAppointment == nil
-                        ? salonTreatments.filter { $0.visitID == copyingFrom?.id } : [],
                     completingAppointment: completingAppointment,
                     appointmentTreatments: appointmentTreatments.filter {
                         $0.appointmentID == completingAppointment?.id
                     }
                 )
             }
-            .sheet(isPresented: $showingAddProduct) { ProductForm() }
-            .sheet(isPresented: $showingAddSalonAppointment) { AppointmentForm() }
-            .sheet(isPresented: $showingAddPurchasePlan) { PurchasePlanForm() }
             .sheet(item: $editingDueAction) { action in
                 dueDateEditor(for: action)
             }
@@ -360,219 +464,141 @@ private struct HomeView: View {
 
     private var header: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("B/ONE")
                     .font(.system(size: 34, weight: .regular, design: .serif))
                     .minimumScaleFactor(0.8)
                     .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
 
-                Text(Date.now.formatted(
-                    .dateTime.month().day().weekday(.abbreviated)
-                        .locale(Locale(identifier: "ja_JP"))
-                ))
-                .font(.subheadline)
+                Text("記録する。整える。もっと、いい自分へ。")
+                .font(.caption)
                 .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 12)
 
-            Menu {
-                Button("美容院の記録", systemImage: "square.and.pencil") {
-                    completingAppointment = nil
-                    copyingFrom = nil
-                    showingAddVisit = true
-                }
-                if let latestVisit = visits.max(by: { $0.date < $1.date }) {
-                    Button("前回から美容院の記録", systemImage: "doc.on.doc") {
-                        completingAppointment = nil
-                        copyingFrom = latestVisit
-                        showingAddVisit = true
-                    }
-                }
-                Button("商品", systemImage: "bag") {
-                    showingAddProduct = true
-                }
-                Divider()
-                Button("美容院の予定", systemImage: "scissors") {
-                    showingAddSalonAppointment = true
-                }
-                Button("購入予定", systemImage: "calendar.badge.plus") {
-                    showingAddPurchasePlan = true
-                }
+            Button {
+                showingSettings = true
             } label: {
-                Image(systemName: "plus")
-                    .font(.title3.weight(.medium))
+                Image(systemName: "gearshape")
+                    .font(.title3)
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.glass)
-            .accessibilityLabel("追加")
+            .accessibilityLabel("設定")
         }
     }
 
     private var maintenanceSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("次のメンテナンス")
-                    .font(.title2.bold())
-                    .accessibilityAddTraits(.isHeader)
-                Spacer()
-                if !actions.isEmpty {
-                    Button("すべて見る", systemImage: "chevron.right") {
-                        showingAllActions = true
-                    }
-                    .labelStyle(.titleAndIcon)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                }
-            }
-
-            if !actionGroups.needsAttention.isEmpty || !actionGroups.withinSevenDays.isEmpty {
-                if !actionGroups.needsAttention.isEmpty {
-                    actionGroup("期限超過・記録待ち", actions: actionGroups.needsAttention, featured: true)
-                }
-                if !actionGroups.withinSevenDays.isEmpty {
-                    actionGroup(
-                        "7日以内", actions: actionGroups.withinSevenDays,
-                        featured: actionGroups.needsAttention.isEmpty
-                    )
-                }
-            } else if let first = actionGroups.later.first {
-                featuredAction(first)
-            } else {
-                ContentUnavailableView(
-                    "次のメンテナンスはありません",
-                    systemImage: "square.stack",
-                    description: Text("美容院の次回目安やアイテムの買い替え目安があると、ここに表示されます。")
-                )
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-            }
-        }
-    }
-
-    private func actionGroup(_ title: String, actions: [HomeAction], featured: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .accessibilityAddTraits(.isHeader)
-                Spacer()
-                Text("\(actions.count)件")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(Array(actions.prefix(2))) { action in
-                if featured && action.id == actions.first?.id {
-                    featuredAction(action)
-                } else {
-                    compactAction(action)
-                }
-            }
-        }
-    }
-
-    private func featuredAction(_ action: HomeAction) -> some View {
-        VStack(spacing: 0) {
-            GeometryReader { geometry in
-                Group {
-                    if let photo = actionPhoto(for: action) {
-                        photo
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                            .clipped()
-                    } else {
-                        Rectangle()
-                            .fill(Color(uiColor: .tertiarySystemGroupedBackground))
-                            .overlay {
-                                Image(systemName: action.kind == .itemReplacement ? "bag" : "scissors")
-                                    .font(.system(size: 46, weight: .ultraLight))
-                                    .foregroundStyle(.secondary)
-                            }
-                    }
-                }
-            }
-            .frame(height: 190)
-            .accessibilityHidden(true)
-
-            VStack(spacing: 16) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(action.title)
-                            .font(.title3.bold())
-                        Text(dateSummary(for: action))
-                            .font(.subheadline)
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("ヘアメンテナンス")
+                        .font(.subheadline.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer()
+                    if actions.count > 1 || (hairActions.isEmpty && !actions.isEmpty) {
+                        Button("すべて見る") { showingAllActions = true }
+                            .font(.caption)
                             .foregroundStyle(.secondary)
-                        if action.kind == .salonNeedsBooking, let detail = action.detail {
-                            Text(detail)
-                                .font(.subheadline)
+                    }
+                    Button {
+                        selectedTab = .calendar
+                    } label: {
+                        Image(systemName: "calendar")
+                            .frame(width: 34, height: 34)
+                    }
+                    .buttonStyle(.glass)
+                    .accessibilityLabel("カレンダーを開く")
+                }
+
+                if let action = hairActions.first {
+                    Button {
+                        handle(action)
+                    } label: {
+                        HStack(spacing: 14) {
+                            maintenancePhoto(for: action)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Hair")
+                                    .font(.caption.weight(.semibold))
+                                Text(maintenanceStatus(for: action))
+                                    .font(.system(
+                                        size: action.daysUntil(referenceDate: .now, calendar: calendar) < 0
+                                            ? 20 : 28,
+                                        weight: .semibold, design: .rounded
+                                    ))
+                                    .monospacedDigit()
+                                Text(action.title)
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                Text(dateSummary(for: action))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(.primary)
+                            Spacer(minLength: 4)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
                                 .foregroundStyle(.secondary)
                         }
+                        .contentShape(Rectangle())
                     }
-                    Spacer()
-                    if action.kind == .salonNeedsBooking {
-                        Text(relativeSummary(for: action))
-                            .font(.title2.bold())
-                            .monospacedDigit()
-                    }
-                }
-
-                Button {
-                    handle(action)
-                } label: {
-                    Label(actionTitle(for: action), systemImage: actionSymbol(for: action))
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 48)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Color(uiColor: .label))
-
-                if action.kind == .itemReplacement {
-                    Button("買い直しを記録", systemImage: "plus") {
-                        registerReplacement(for: action)
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    if let url = action.destinationURL {
-                        Button("もう一度購入", systemImage: "arrow.up.right") {
-                            openURL(url)
-                        }
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-
-                if action.kind == .salonNeedsBooking {
-                    Button("予約済みの予定を追加", systemImage: "calendar.badge.plus") {
-                        recordBooking(for: action)
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    Button("前回の記録", systemImage: "chevron.right") {
-                        selectedVisitID = action.visitID
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("ヘアメンテナンス、\(action.title)、\(maintenanceStatus(for: action))")
+                    .accessibilityHint(actionTitle(for: action))
+                } else {
+                    Button {
                         selectedTab = .archive
+                    } label: {
+                        HStack(spacing: 14) {
+                            Image(systemName: "scissors")
+                                .font(.title2)
+                                .frame(width: 86, height: 86)
+                                .background(Color(uiColor: .tertiarySystemGroupedBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("次のヘアメンテナンスはありません")
+                                    .font(.headline)
+                                Text("記録を追加すると目安を確認できます")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 4)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                                .foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    if action.baselineDate != nil {
-                        adjustmentMenu(for: action)
-                            .font(.subheadline)
-                    }
-                }
-                if action.kind == .salonBooked || action.kind == .salonNeedsRecord {
-                    Button("予定を変更・キャンセル", systemImage: "calendar.badge.clock") {
-                        editAppointment(for: action)
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(18)
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(uiColor: .secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private func maintenancePhoto(for action: HomeAction) -> some View {
+        Group {
+            if let photo = actionPhoto(for: action) {
+                photo
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 86, height: 86)
+                    .clipped()
+            } else {
+                Image(systemName: "scissors")
+                    .font(.title2)
+                    .frame(width: 86, height: 86)
+                    .background(Color(uiColor: .tertiarySystemGroupedBackground))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityHidden(true)
     }
 
     private func compactAction(_ action: HomeAction) -> some View {
@@ -661,33 +687,69 @@ private struct HomeView: View {
                 .font(.title2.bold())
                 .accessibilityAddTraits(.isHeader)
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 10)], spacing: 10) {
-                category("Hair", symbol: "scissors", tab: .archive)
-                category("Cosmetics", symbol: "bag", tab: .items)
-                category("香水", symbol: "sparkles", tab: .items)
+            HStack(alignment: .top, spacing: 8) {
+                category("Hair", imageData: latestSalonPhotoData, symbol: "scissors", tab: .archive)
+                category("Cosmetics", imageData: latestProductPhotoData(in: .cosmetics),
+                         symbol: "bag", tab: .items)
+                category("Fragrance", imageData: latestProductPhotoData(in: .fragrance),
+                         symbol: "sparkles", tab: .items)
             }
         }
     }
 
-    private func category(_ title: String, symbol: String, tab: AppTab) -> some View {
+    private var latestSalonPhotoData: Data? {
+        for visit in visits.sorted(by: { $0.date > $1.date }) {
+            if let photo = salonPhotos.filter({ $0.visitID == visit.id })
+                .min(by: { $0.sortOrder < $1.sortOrder }), !photo.imageData.isEmpty {
+                return photo.imageData
+            }
+        }
+        return nil
+    }
+
+    private func latestProductPhotoData(in category: ProductCategory) -> Data? {
+        products.filter { $0.category == category && !$0.imageData.isEmpty }
+            .max(by: { $0.updatedAt < $1.updatedAt })?.imageData
+    }
+
+    private func category(
+        _ title: String, imageData: Data?, symbol: String, tab: AppTab
+    ) -> some View {
         Button {
             selectedTab = tab
         } label: {
-            VStack(spacing: 9) {
-                Image(systemName: symbol)
-                    .font(.title2)
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack {
+                    Color(uiColor: .tertiarySystemGroupedBackground)
+                    if let imageData, let image = UIImage(data: imageData) {
+                        GeometryReader { geometry in
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: geometry.size.width, height: geometry.size.height)
+                                .clipped()
+                        }
+                    } else {
+                        Image(systemName: symbol)
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(height: 82)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .accessibilityHidden(true)
                 Text(title)
-                    .font(.subheadline)
+                    .font(.caption.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
+            .padding(8)
             .frame(maxWidth: .infinity)
-            .frame(minHeight: 78)
             .background(Color(uiColor: .secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(title)を開く")
+        .accessibilityLabel("\(title == "Fragrance" ? "香水" : title)を開く")
     }
 
     private func actionPhoto(for action: HomeAction) -> Image? {
@@ -752,6 +814,10 @@ private struct HomeView: View {
         if days < 0 { return "目安を過ぎました" }
         if days == 0 { return "今日" }
         return "あと\(days)日"
+    }
+
+    private func maintenanceStatus(for action: HomeAction) -> String {
+        action.kind == .salonNeedsRecord ? "記録待ち" : relativeSummary(for: action)
     }
 
     private func actionTitle(for action: HomeAction) -> String {
