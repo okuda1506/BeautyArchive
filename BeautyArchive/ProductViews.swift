@@ -253,6 +253,8 @@ private struct ProductDetail: View {
                 Section("メモ") { Text(product.note) }
             }
         }
+        // Keep the last section scrollable above the custom bottom navigation bar.
+        .contentMargins(.bottom, 96, for: .scrollContent)
         .navigationTitle(product.name)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
