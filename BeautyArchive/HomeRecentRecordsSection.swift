@@ -77,7 +77,7 @@ struct HomeRecentRecordsSection: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text("最近の記録")
-                    .font(.title2.bold())
+                    .font(BOneTypography.section)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 if !records.isEmpty {
@@ -157,7 +157,7 @@ struct HomeRecentRecordsSection: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(record.category)
-                        .font(.subheadline.weight(.semibold))
+                        .font(BOneTypography.eyebrow)
                     Text(record.date, format: .dateTime.year().month().day())
                         .font(.caption)
                         .foregroundStyle(.secondary)

@@ -46,7 +46,7 @@ struct SalonArchiveView: View {
                                     }
                                     VStack(alignment: .leading, spacing: 5) {
                                         Text(visit.date, format: .dateTime.year().month().day())
-                                            .font(.headline)
+                                            .font(BOneTypography.rowTitle)
                                         Text(treatmentNames(for: visit))
                                             .font(.subheadline)
                                             .foregroundStyle(.secondary)

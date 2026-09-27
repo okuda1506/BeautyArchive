@@ -115,7 +115,7 @@ struct AppointmentListView: View {
                     Section("Googleへの反映を確認") {
                         ForEach(googleLinksNeedingAttention) { link in
                             VStack(alignment: .leading, spacing: 6) {
-                                Text(link.title).font(.headline)
+                                Text(link.title).font(BOneTypography.rowTitle)
                                 Text(link.state.title)
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
@@ -190,7 +190,7 @@ struct AppointmentListView: View {
     private func appointmentRow(_ appointment: BeautyAppointment) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Text(appointment.title).font(.headline)
+                Text(appointment.title).font(BOneTypography.rowTitle)
                 Spacer()
                 if appointment.isCancelled {
                     Text("キャンセル済み")
@@ -223,7 +223,7 @@ struct AppointmentListView: View {
 
     private func googleEventRow(_ event: GoogleCalendarEvent) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(event.title).font(.headline)
+            Text(event.title).font(BOneTypography.rowTitle)
             Text(event.isAllDay
                  ? "終日"
                  : "\(event.startAt.formatted(date: .abbreviated, time: .shortened))〜\(event.endAt.formatted(date: .abbreviated, time: .shortened))")
@@ -240,7 +240,7 @@ struct AppointmentListView: View {
     private func purchasePlanRow(_ plan: ProductPurchasePlan) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Text(plan.productName).font(.headline)
+                Text(plan.productName).font(BOneTypography.rowTitle)
                 Spacer()
                 Text(plan.status.title)
                     .font(.caption)
