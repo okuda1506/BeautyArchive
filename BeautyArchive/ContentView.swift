@@ -829,11 +829,11 @@ private struct HomeView: View {
 
     private var categorySection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("カテゴリ")
+            Text("カテゴリで探す")
                 .font(BOneTypography.section)
                 .accessibilityAddTraits(.isHeader)
 
-            HStack(alignment: .top, spacing: 8) {
+            HStack(spacing: 10) {
                 category("Hair", imageName: "HomeCategoryHair", tab: .archive)
                 category("Cosmetics", imageName: "HomeCategoryCosmetics", tab: .items)
                 category("Fragrance", imageName: "HomeCategoryFragrance", tab: .items)
@@ -847,29 +847,40 @@ private struct HomeView: View {
         Button {
             selectedTab = tab
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                ZStack {
-                    Color(uiColor: .tertiarySystemGroupedBackground)
-                    GeometryReader { geometry in
-                        Image(imageName)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                            .clipped()
-                    }
-                }
-                .frame(height: 82)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .accessibilityHidden(true)
+            GeometryReader { geometry in
+                Image(imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+            }
+            .overlay(alignment: .bottom) {
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.64)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 58)
+                .allowsHitTesting(false)
+            }
+            .overlay(alignment: .bottomLeading) {
                 Text(title)
-                    .font(.caption.weight(.medium))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+                    .padding(10)
             }
-            .padding(8)
+            .frame(height: 112)
+            .clipShape(RoundedRectangle(cornerRadius: 11))
+            .overlay {
+                RoundedRectangle(cornerRadius: 11)
+                    .strokeBorder(.white.opacity(0.32), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: .black.opacity(0.13), radius: 7, y: 3)
             .frame(maxWidth: .infinity)
-            .background(Color(uiColor: .secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .contentShape(RoundedRectangle(cornerRadius: 11))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(title == "Fragrance" ? "香水" : title)を開く")
