@@ -204,7 +204,8 @@ private struct ProductDetail: View {
                 Section("商品画像") {
                     PhotoGallery(
                         photos: [StoredPhoto(id: product.id, data: product.imageData)],
-                        thumbnailSize: 220
+                        thumbnailSize: 220,
+                        centersSinglePhoto: true
                     )
                 }
             }

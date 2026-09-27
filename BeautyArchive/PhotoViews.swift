@@ -120,33 +120,47 @@ struct PhotoEditor: View {
 struct PhotoGallery: View {
     let photos: [StoredPhoto]
     let thumbnailSize: CGFloat
+    let centersSinglePhoto: Bool
     @State private var selectedPhoto: StoredPhoto?
 
-    init(photos: [StoredPhoto], thumbnailSize: CGFloat = 120) {
+    init(photos: [StoredPhoto], thumbnailSize: CGFloat = 120, centersSinglePhoto: Bool = false) {
         self.photos = photos
         self.thumbnailSize = thumbnailSize
+        self.centersSinglePhoto = centersSinglePhoto
     }
 
     var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 12) {
-                ForEach(photos) { photo in
-                    Button {
-                        selectedPhoto = photo
-                    } label: {
-                        PhotoImage(data: photo.data)
-                            .frame(width: thumbnailSize, height: thumbnailSize)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+        Group {
+            if centersSinglePhoto, photos.count == 1, let photo = photos.first {
+                photoButton(photo)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 4)
+            } else {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 12) {
+                        ForEach(photos) { photo in
+                            photoButton(photo)
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("写真を拡大")
+                    .padding(.vertical, 4)
                 }
             }
-            .padding(.vertical, 4)
         }
         .fullScreenCover(item: $selectedPhoto) { photo in
             PhotoFullscreen(photo: photo)
         }
+    }
+
+    private func photoButton(_ photo: StoredPhoto) -> some View {
+        Button {
+            selectedPhoto = photo
+        } label: {
+            PhotoImage(data: photo.data)
+                .frame(width: thumbnailSize, height: thumbnailSize)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("写真を拡大")
     }
 }
 
