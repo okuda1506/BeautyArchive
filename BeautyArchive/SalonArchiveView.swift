@@ -88,7 +88,7 @@ struct SalonArchiveView: View {
                                 copyingFrom = nil
                                 showingAdd = true
                             }
-                            Button("前回のサロン情報を使う", systemImage: "doc.on.doc") {
+                            Button("前回の記録から作成", systemImage: "doc.on.doc") {
                                 copyingFrom = latestVisit
                                 showingAdd = true
                             }
@@ -106,7 +106,10 @@ struct SalonArchiveView: View {
                 }
             }
             .sheet(isPresented: $showingAdd) {
-                SalonVisitForm(copying: copyingFrom)
+                SalonVisitForm(
+                    copying: copyingFrom,
+                    copyingTreatments: treatments.filter { $0.visitID == copyingFrom?.id }
+                )
             }
             .alert("保存できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
@@ -248,6 +251,7 @@ struct SalonVisitForm: View {
     let visit: SalonVisit?
     let existingTreatments: [SalonTreatment]
     let completingAppointment: BeautyAppointment?
+    let isCopyingPreviousVisit: Bool
     @State private var date: Date
     @State private var salonName: String
     @State private var stylistName: String
@@ -266,12 +270,14 @@ struct SalonVisitForm: View {
         visit: SalonVisit? = nil,
         treatments: [SalonTreatment] = [],
         copying: SalonVisit? = nil,
+        copyingTreatments: [SalonTreatment] = [],
         completingAppointment: BeautyAppointment? = nil,
         appointmentTreatments: [AppointmentTreatment] = []
     ) {
         self.visit = visit
         self.existingTreatments = treatments
         self.completingAppointment = completingAppointment
+        self.isCopyingPreviousVisit = copying != nil
         _date = State(initialValue: visit?.date ?? .now)
         _salonName = State(initialValue:
             visit?.salonName ?? copying?.salonName ?? completingAppointment?.shopName ?? "")
@@ -289,6 +295,10 @@ struct SalonVisitForm: View {
             _drafts = State(initialValue: appointmentTreatments.map {
                 TreatmentDraft(name: $0.name)
             })
+        } else if copying != nil && !copyingTreatments.isEmpty {
+            _drafts = State(initialValue: copyingTreatments.map {
+                TreatmentDraft(name: $0.name, cycleDays: $0.cycleDays)
+            })
         } else {
             _drafts = State(initialValue: [TreatmentDraft()])
         }
@@ -298,6 +308,11 @@ struct SalonVisitForm: View {
     var body: some View {
         NavigationStack {
             Form {
+                if isCopyingPreviousVisit {
+                    Text("前回のサロン・担当者・施術を引き継ぎました。今回の内容を確認して保存してください。")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
                 Section("来店日") {
                     DatePicker("来店日", selection: $date, in: ...Date.now, displayedComponents: .date)
                     if let completingAppointment {
