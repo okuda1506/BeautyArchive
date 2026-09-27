@@ -2,6 +2,33 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 
+private enum ProductStatusFilter: String, CaseIterable, Identifiable {
+    case all
+    case inUse
+    case unopened
+    case ended
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .all: "すべて"
+        case .inUse: "使用中"
+        case .unopened: "未開封"
+        case .ended: "使用終了"
+        }
+    }
+
+    func matches(_ status: ProductUnitStatus?) -> Bool {
+        switch self {
+        case .all: true
+        case .inUse: status == .inUse
+        case .unopened: status == .unopened
+        case .ended: status == .finished || status == .stopped
+        }
+    }
+}
+
 struct ProductListView: View {
     @Binding var selectedProductID: UUID?
     @Environment(\.modelContext) private var modelContext
@@ -10,6 +37,17 @@ struct ProductListView: View {
     @State private var showingAdd = false
     @State private var errorMessage: String?
     @State private var path: [UUID] = []
+    @State private var searchText = ""
+    @State private var statusFilter: ProductStatusFilter = .all
+
+    private var filteredProducts: [BeautyProduct] {
+        let search = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return products.filter { product in
+            (search.isEmpty || product.name.localizedStandardContains(search)
+                || product.brand.localizedStandardContains(search))
+                && statusFilter.matches(currentStatus(for: product))
+        }
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -22,8 +60,16 @@ struct ProductListView: View {
                     )
                 } else {
                     List {
+                        Picker("使用状況", selection: $statusFilter) {
+                            ForEach(ProductStatusFilter.allCases) { filter in
+                                Text(filter.title).tag(filter)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .listRowBackground(Color.clear)
+
                         ForEach(ProductCategory.allCases) { category in
-                            let categoryProducts = products.filter { $0.category == category }
+                            let categoryProducts = filteredProducts.filter { $0.category == category }
                             if !categoryProducts.isEmpty {
                                 Section(category.title) {
                                     ForEach(categoryProducts) { product in
@@ -50,6 +96,11 @@ struct ProductListView: View {
                                                             .font(.subheadline)
                                                             .foregroundStyle(.secondary)
                                                     }
+                                                    if let status = currentStatus(for: product) {
+                                                        Text(status.title)
+                                                            .font(.caption)
+                                                            .foregroundStyle(.secondary)
+                                                    }
                                                 }
                                             }
                                             .padding(.vertical, 3)
@@ -59,7 +110,22 @@ struct ProductListView: View {
                                 }
                             }
                         }
+                        if filteredProducts.isEmpty {
+                            Section {
+                                ContentUnavailableView(
+                                    "該当する商品がありません",
+                                    systemImage: "magnifyingglass",
+                                    description: Text("検索語や使用状況を変えてみてください。")
+                                )
+                                Button("条件をクリア") {
+                                    searchText = ""
+                                    statusFilter = .all
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
                     }
+                    .searchable(text: $searchText, prompt: "商品名・ブランドで検索")
                 }
             }
             .navigationTitle("アイテム")
@@ -89,6 +155,13 @@ struct ProductListView: View {
             .onChange(of: selectedProductID) { _, _ in openSelectedProduct() }
             .onChange(of: products.map(\.id)) { _, _ in openSelectedProduct() }
         }
+    }
+
+    private func currentStatus(for product: BeautyProduct) -> ProductUnitStatus? {
+        let productUnits = units.filter { $0.productID == product.id }
+        if productUnits.contains(where: { $0.status == .inUse }) { return .inUse }
+        if productUnits.contains(where: { $0.status == .unopened }) { return .unopened }
+        return productUnits.max(by: { $0.updatedAt < $1.updatedAt })?.status
     }
 
     private func openSelectedProduct() {
