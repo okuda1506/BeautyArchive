@@ -125,6 +125,7 @@ struct ProductListView: View {
                             }
                         }
                     }
+                    .contentMargins(.bottom, BottomNavigationLayout.scrollContentClearance, for: .scrollContent)
                     .searchable(text: $searchText, prompt: "商品名・ブランドで検索")
                 }
             }
@@ -254,7 +255,7 @@ private struct ProductDetail: View {
             }
         }
         // Keep the last section scrollable above the custom bottom navigation bar.
-        .contentMargins(.bottom, 96, for: .scrollContent)
+        .contentMargins(.bottom, BottomNavigationLayout.scrollContentClearance, for: .scrollContent)
         .navigationTitle(product.name)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

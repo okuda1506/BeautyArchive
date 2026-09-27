@@ -18,6 +18,10 @@ private enum AddDestination: String, Identifiable {
     var id: String { rawValue }
 }
 
+enum BottomNavigationLayout {
+    static let scrollContentClearance: CGFloat = 96
+}
+
 struct ContentView: View {
     private struct ContentAlert {
         let title: String
@@ -538,8 +542,8 @@ private struct HomeView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 22)
-                .padding(.bottom, 32)
             }
+            .contentMargins(.bottom, BottomNavigationLayout.scrollContentClearance, for: .scrollContent)
             .background(Color(uiColor: .systemGroupedBackground))
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingAllActions, onDismiss: {
