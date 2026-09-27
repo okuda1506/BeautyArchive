@@ -215,19 +215,47 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 28, weight: .light))
-                    .foregroundStyle(.white)
-                    .frame(width: 58, height: 58)
-                    .glassEffect(.regular.tint(.gray), in: Circle())
+                    .foregroundStyle(Color(uiColor: .label))
+                    .frame(width: 60, height: 60)
+                    .glassEffect(.regular.tint(.gray.opacity(0.38)).interactive(), in: Circle())
+                    .overlay {
+                        Circle().fill(
+                            RadialGradient(
+                                colors: [.white.opacity(0.28), .white.opacity(0.04), .clear],
+                                center: .init(x: 0.25, y: 0.18),
+                                startRadius: 0,
+                                endRadius: 52
+                            )
+                        )
+                        .allowsHitTesting(false)
+                    }
+                    .overlay {
+                        Circle().strokeBorder(.white.opacity(0.5), lineWidth: 1)
+                            .allowsHitTesting(false)
+                    }
+                    .shadow(color: .black.opacity(0.18), radius: 10, y: 5)
             }
             .frame(maxWidth: .infinity)
-            .tint(.white)
+            .tint(Color(uiColor: .label))
             .accessibilityLabel("追加")
             tabButton(.calendar, title: "カレンダー", symbol: "calendar", selectedSymbol: "calendar")
             tabButton(.items, title: "アイテム", symbol: "bag", selectedSymbol: "bag.fill")
         }
         .frame(height: 68)
         .padding(.horizontal, 8)
-        .glassEffect(.regular, in: Capsule())
+        .glassEffect(.regular.tint(Color(uiColor: .systemGray3).opacity(0.32)), in: Capsule())
+        .overlay {
+            Capsule().strokeBorder(
+                LinearGradient(
+                    colors: [.white.opacity(0.55), .white.opacity(0.12), .white.opacity(0.32)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+            .allowsHitTesting(false)
+        }
+        .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
         .padding(.horizontal, 16)
         .padding(.top, 6)
         .padding(.bottom, 4)
