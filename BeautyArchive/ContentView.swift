@@ -649,9 +649,12 @@ private struct HomeView: View {
                         selectedTab = .calendar
                     } label: {
                         Image(systemName: "calendar")
-                            .frame(width: 34, height: 34)
+                            .foregroundStyle(.primary)
+                            .frame(width: 44, height: 44)
+                            .glassEffect(.regular.interactive(), in: Circle())
+                            .contentShape(Circle())
                     }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.plain)
                     .accessibilityLabel("カレンダーを開く")
                 }
 
