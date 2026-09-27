@@ -267,15 +267,18 @@ private struct HomeView: View {
                 VStack(alignment: .leading, spacing: 30) {
                     header
                     maintenanceSection
-                    HomeItemsSection(
-                        products: products,
-                        units: productUnits,
-                        onSelectProduct: { productID in
-                            selectedProductID = productID
-                            selectedTab = .items
-                        },
-                        onShowAll: { selectedTab = .items }
-                    )
+                    ForEach(ProductCategory.allCases) { category in
+                        HomeItemsSection(
+                            category: category,
+                            products: products,
+                            units: productUnits,
+                            onSelectProduct: { productID in
+                                selectedProductID = productID
+                                selectedTab = .items
+                            },
+                            onShowAll: { selectedTab = .items }
+                        )
+                    }
                     categorySection
                 }
                 .padding(.horizontal, 20)
