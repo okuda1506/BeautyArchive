@@ -52,15 +52,36 @@ struct HomeAction: Identifiable {
         self.hasDueDateOverride = hasDueDateOverride
     }
 
-    static func upcoming(from actions: [HomeAction], limit: Int = 3) -> [HomeAction] {
-        Array(actions.sorted { $0.date < $1.date }.prefix(max(0, limit)))
-    }
-
     func daysUntil(referenceDate: Date, calendar: Calendar = .current) -> Int {
         calendar.dateComponents(
             [.day],
             from: calendar.startOfDay(for: referenceDate),
             to: calendar.startOfDay(for: date)
         ).day ?? 0
+    }
+}
+
+struct HomeActionGroups {
+    let needsAttention: [HomeAction]
+    let withinSevenDays: [HomeAction]
+    let later: [HomeAction]
+
+    init(actions: [HomeAction], referenceDate: Date = .now, calendar: Calendar = .current) {
+        var needsAttention: [HomeAction] = []
+        var withinSevenDays: [HomeAction] = []
+        var later: [HomeAction] = []
+        for action in actions.sorted(by: { $0.date < $1.date }) {
+            let days = action.daysUntil(referenceDate: referenceDate, calendar: calendar)
+            if days < 0 || action.kind == .salonNeedsRecord {
+                needsAttention.append(action)
+            } else if days <= 7 {
+                withinSevenDays.append(action)
+            } else {
+                later.append(action)
+            }
+        }
+        self.needsAttention = needsAttention
+        self.withinSevenDays = withinSevenDays
+        self.later = later
     }
 }

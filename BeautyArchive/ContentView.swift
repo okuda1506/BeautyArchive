@@ -258,7 +258,7 @@ private struct HomeView: View {
     @State private var pendingDueAction: HomeAction?
     @State private var editedDueDate = Date.now
 
-    private var upcoming: [HomeAction] { HomeAction.upcoming(from: actions) }
+    private var actionGroups: HomeActionGroups { HomeActionGroups(actions: actions) }
     private var calendar: Calendar { .current }
 
     var body: some View {
@@ -424,11 +424,18 @@ private struct HomeView: View {
                 }
             }
 
-            if let first = upcoming.first {
-                featuredAction(first)
-                ForEach(upcoming.dropFirst()) { action in
-                    compactAction(action)
+            if !actionGroups.needsAttention.isEmpty || !actionGroups.withinSevenDays.isEmpty {
+                if !actionGroups.needsAttention.isEmpty {
+                    actionGroup("期限超過・記録待ち", actions: actionGroups.needsAttention, featured: true)
                 }
+                if !actionGroups.withinSevenDays.isEmpty {
+                    actionGroup(
+                        "7日以内", actions: actionGroups.withinSevenDays,
+                        featured: actionGroups.needsAttention.isEmpty
+                    )
+                }
+            } else if let first = actionGroups.later.first {
+                featuredAction(first)
             } else {
                 ContentUnavailableView(
                     "次のメンテナンスはありません",
@@ -437,6 +444,27 @@ private struct HomeView: View {
                 )
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
+            }
+        }
+    }
+
+    private func actionGroup(_ title: String, actions: [HomeAction], featured: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Text("\(actions.count)件")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(Array(actions.prefix(2))) { action in
+                if featured && action.id == actions.first?.id {
+                    featuredAction(action)
+                } else {
+                    compactAction(action)
+                }
             }
         }
     }
@@ -669,8 +697,22 @@ private struct HomeView: View {
 
     private var allActionsSheet: some View {
         NavigationStack {
-            List(actions.sorted { $0.date < $1.date }) { action in
-                compactAction(action)
+            List {
+                if !actionGroups.needsAttention.isEmpty {
+                    Section("期限超過・記録待ち") {
+                        ForEach(actionGroups.needsAttention) { compactAction($0) }
+                    }
+                }
+                if !actionGroups.withinSevenDays.isEmpty {
+                    Section("7日以内") {
+                        ForEach(actionGroups.withinSevenDays) { compactAction($0) }
+                    }
+                }
+                if !actionGroups.later.isEmpty {
+                    Section("それ以降") {
+                        ForEach(actionGroups.later) { compactAction($0) }
+                    }
+                }
             }
             .navigationTitle("次のメンテナンス")
             .toolbar {

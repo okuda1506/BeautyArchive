@@ -113,6 +113,8 @@ Creating a salon visit from the previous record carries over the salon, stylist,
 
 The item list supports name and brand search plus filters for in-use, unopened, and ended products.
 
+Home separates overdue actions and visit records awaiting completion from actions due within seven days; later actions remain available in the full list.
+
 **Still planned:** iCloud sync is configured but has not been verified across devices. Google write-back across multiple devices also needs real-world validation. The initial release does not include manufacturer expiry dates or period-after-opening tracking.
 
 ## Tech Stack
