@@ -83,6 +83,7 @@ struct ContentView: View {
                 HomeView(
                     actions: actions,
                     visits: visits,
+                    salonTreatments: treatments,
                     appointments: appointments,
                     appointmentTreatments: appointmentTreatments,
                     salonReminderAdjustments: salonReminderAdjustments,
@@ -225,6 +226,7 @@ private struct HomeView: View {
     @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
     let actions: [HomeAction]
     let visits: [SalonVisit]
+    let salonTreatments: [SalonTreatment]
     let appointments: [BeautyAppointment]
     let appointmentTreatments: [AppointmentTreatment]
     let salonReminderAdjustments: [SalonReminderAdjustment]
@@ -237,6 +239,7 @@ private struct HomeView: View {
     @Environment(\.openURL) private var openURL
     @State private var showingAllActions = false
     @State private var showingAddVisit = false
+    @State private var copyingFrom: SalonVisit?
     @State private var showingAddProduct = false
     @State private var showingAddSalonAppointment = false
     @State private var showingAddPurchasePlan = false
@@ -307,6 +310,9 @@ private struct HomeView: View {
             }
             .sheet(isPresented: $showingAddVisit) {
                 SalonVisitForm(
+                    copying: completingAppointment == nil ? copyingFrom : nil,
+                    copyingTreatments: completingAppointment == nil
+                        ? salonTreatments.filter { $0.visitID == copyingFrom?.id } : [],
                     completingAppointment: completingAppointment,
                     appointmentTreatments: appointmentTreatments.filter {
                         $0.appointmentID == completingAppointment?.id
@@ -371,7 +377,15 @@ private struct HomeView: View {
             Menu {
                 Button("美容院の記録", systemImage: "square.and.pencil") {
                     completingAppointment = nil
+                    copyingFrom = nil
                     showingAddVisit = true
+                }
+                if let latestVisit = visits.max(by: { $0.date < $1.date }) {
+                    Button("前回から美容院の記録", systemImage: "doc.on.doc") {
+                        completingAppointment = nil
+                        copyingFrom = latestVisit
+                        showingAddVisit = true
+                    }
                 }
                 Button("商品", systemImage: "bag") {
                     showingAddProduct = true
