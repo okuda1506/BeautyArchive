@@ -2,42 +2,32 @@ import Foundation
 
 @MainActor
 enum ProductNotificationScheduler {
-    private static let identifierPrefix = "beautyarchive.product-replacement."
-
-    static func reconcile(
+    static func targets(
         products: [BeautyProduct],
         units: [ProductUnit],
-        enabled: Bool,
-        leadDays: Int,
-        now: Date = .now,
         calendar: Calendar = .current
-    ) async -> String? {
+    ) -> [ReminderNotificationTarget] {
         let productsByID = Dictionary(
             products.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }
         )
-        let plans = units.compactMap { unit -> LocalNotificationPlan? in
+        return units.compactMap { unit -> ReminderNotificationTarget? in
             guard unit.wantsReplacementNotification,
                   let product = productsByID[unit.productID],
                   let estimate = ReplacementEstimate.calculate(
                     for: unit, among: units, calendar: calendar
-                  ),
-                  let fireDate = LocalNotificationReconciler.fireDate(
-                    for: estimate.date, leadDays: leadDays, now: now, calendar: calendar
-                  )
+                  ), let openedAt = unit.openedAt
             else { return nil }
-            return LocalNotificationPlan(
-                identifier: identifierPrefix + unit.id.uuidString,
-                fireDate: fireDate,
+            return ReminderNotificationTarget(
+                kind: .product, id: unit.id,
+                revision: "\(product.id.uuidString):\(openedAt.timeIntervalSince1970):\(estimate.date.timeIntervalSince1970)",
+                reminderDate: estimate.date, usesLeadTime: true,
                 title: "買い替えの目安です",
                 body: "\(product.name) の買い替え時期が近づいています。",
-                userInfo: [
+                metadata: [
                     "productID": product.id.uuidString,
                     "unitID": unit.id.uuidString
                 ]
             )
-        }.sorted { $0.fireDate < $1.fireDate }
-        return await LocalNotificationReconciler.reconcile(
-            prefix: identifierPrefix, plans: plans, enabled: enabled, calendar: calendar
-        )
+        }
     }
 }

@@ -187,6 +187,9 @@ struct ContentView: View {
                 )
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .reminderNotificationActionFinished)) { _ in
+            scheduleNotificationReconciliation()
+        }
         .alert(contentAlert?.title ?? "", isPresented: Binding(
             get: { contentAlert != nil },
             set: { if !$0 { contentAlert = nil } }
@@ -216,28 +219,11 @@ struct ContentView: View {
         previousTask?.cancel()
         notificationTask = Task {
             await previousTask?.value
-            let leadDays = ReminderPreferences.effectiveLeadDays(
-                choice: reminderTiming.leadChoice,
-                customDays: reminderTiming.customLeadDays
-            )
-            let productError = await ProductNotificationScheduler.reconcile(
-                products: products,
-                units: productUnits,
-                enabled: remindersEnabled,
-                leadDays: leadDays
-            )
             guard !Task.isCancelled else { return }
-            let salonError = await SalonNotificationScheduler.reconcile(
-                visits: visits,
-                treatments: treatments,
-                appointments: appointments,
-                appointmentTreatments: appointmentTreatments,
-                reminderAdjustments: salonReminderAdjustments,
-                enabled: remindersEnabled,
-                leadDays: leadDays
-            )
+            let error = await ReminderNotificationCoordinator.shared.reconcile()
             guard !Task.isCancelled else { return }
-            if let error = productError ?? salonError {
+            let actionError = ReminderNotificationCoordinator.shared.takeActionError()
+            if let error = error ?? actionError {
                 contentAlert = ContentAlert(title: "通知を予約できませんでした", message: error)
             }
         }
@@ -1133,7 +1119,12 @@ private struct HomeView: View {
         }
         change(adjustment)
         adjustment.updatedAt = .now
-        do { try modelContext.save() }
+        do {
+            try modelContext.save()
+            ReminderNotificationSnoozeStore.shared.set(
+                nil, for: ReminderNotificationTarget.Kind.salon.identifierPrefix + action.id.uuidString
+            )
+        }
         catch {
             modelContext.rollback()
             homeAlert = .adjustmentFailure(error.localizedDescription)
@@ -1143,7 +1134,12 @@ private struct HomeView: View {
     private func clearAdjustment(for action: HomeAction) {
         guard let adjustment = activeAdjustment(for: action) else { return }
         modelContext.delete(adjustment)
-        do { try modelContext.save() }
+        do {
+            try modelContext.save()
+            ReminderNotificationSnoozeStore.shared.set(
+                nil, for: ReminderNotificationTarget.Kind.salon.identifierPrefix + action.id.uuidString
+            )
+        }
         catch {
             modelContext.rollback()
             homeAlert = .adjustmentFailure(error.localizedDescription)
