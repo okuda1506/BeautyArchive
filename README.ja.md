@@ -140,6 +140,8 @@ Google Calendar との連携も予定しているが、Google アカウントは
 
 **今後実装する機能：** iCloud同期の設定は追加済みですが、複数端末での実動作は未検証です。Googleへの反映も複数端末での実動作確認が必要です。メーカー表示の期限や開封後の使用期限の管理は初期リリースに含めません。
 
+美容院の再予約通知と化粧品・香水の買い替え通知には、「明日また通知」「1週間後に通知」を追加しています。Apple Watchへ転送された通知からも、Watch専用アプリなしで操作できます。再通知は選択した日数後の午前9時で、ペアリング先のiPhoneが処理します。延期はそのiPhoneの通知だけに反映され、目安日・使用日数は変わりません。Watchでの実配信とバックグラウンド起動は未検証です。[Apple Watch通知の実機確認手順](docs/AppleWatchReminderManualQA.ja.md)を参照してください。
+
 ## 技術スタック
 
 - **現在のプロジェクト:** Swift、SwiftUI、SwiftData、CloudKit、PhotosPicker、UserNotifications、Google OAuth、Google Calendar API、Xcode、XCTestのテストターゲット。
@@ -158,6 +160,8 @@ Google Calendar との連携も予定しているが、Google アカウントは
 シミュレータやGoogleアカウントを使わずにGoogleカレンダーへの書き込みリクエストを検証するには、macOSで`bash scripts/check-google-calendar-writer.sh`を実行します。ローカルのURLProtocolモックを使用するため、実際のGoogle認可・API動作の確認にはなりません。
 
 `bash scripts/check-google-account-binding.sh`では、連携先を切り替えても進行中の予定操作に別アカウントのトークンが渡らないことを、メモリ内の認証情報で確認できます。
+
+`bash scripts/check-reminder-notification-actions.sh`では、macOS上で延期日時・端末内保存・無効な対象・予約失敗時の復元・通知処理の競合を確認できます。通知予約のモックとメモリ内のSwiftDataストアを使い、シミュレータの起動や実際の通知配信は行いません。
 
 初期リリース前には[Google Calendar実アカウント確認手順](docs/GoogleCalendarManualQA.ja.md)に沿って実機で確認します。この実アカウント検証はまだ実施していません。
 

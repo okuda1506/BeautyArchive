@@ -10,9 +10,26 @@ import SwiftData
 
 @main
 struct BeautyArchiveApp: App {
+    @UIApplicationDelegateAdaptor(ReminderNotificationAppDelegate.self) private var notificationDelegate
     @AppStorage("onboarding.hasStarted") private var hasStarted = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var reminderTiming = ReminderTimingSettings()
+    private let modelContainer: ModelContainer
+
+    init() {
+        do {
+            modelContainer = try ModelContainer(for:
+                SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
+                HairStyleReference.self, ReferencePhoto.self,
+                BeautyAppointment.self, AppointmentTreatment.self, GoogleAppointmentLink.self,
+                BeautyProduct.self, ProductUnit.self, ProductPurchasePlan.self,
+                SalonReminderAdjustment.self
+            )
+        } catch {
+            fatalError("B/ONEのデータストアを開けませんでした: \(error.localizedDescription)")
+        }
+        ReminderNotificationCoordinator.shared.configure(container: modelContainer)
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -35,12 +52,6 @@ struct BeautyArchiveApp: App {
                 }
             }
         }
-        .modelContainer(for: [
-            SalonVisit.self, SalonTreatment.self, SalonPhoto.self,
-            HairStyleReference.self, ReferencePhoto.self,
-            BeautyAppointment.self, AppointmentTreatment.self, GoogleAppointmentLink.self,
-            BeautyProduct.self, ProductUnit.self, ProductPurchasePlan.self,
-            SalonReminderAdjustment.self
-        ])
+        .modelContainer(modelContainer)
     }
 }

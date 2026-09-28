@@ -1,11 +1,13 @@
 import Foundation
 import UserNotifications
 
+@MainActor
 struct LocalNotificationPlan {
     let identifier: String
     let fireDate: Date
     let title: String
     let body: String
+    let categoryIdentifier: String
     let userInfo: [String: String]
 }
 
@@ -27,7 +29,7 @@ enum LocalNotificationReconciler {
     }
 
     static func reconcile(
-        prefix: String,
+        targets: [ReminderNotificationTarget],
         plans: [LocalNotificationPlan],
         enabled: Bool,
         calendar: Calendar = .current
@@ -47,7 +49,7 @@ enum LocalNotificationReconciler {
         )
         let pending = await center.pendingNotificationRequests()
         guard !Task.isCancelled else { return nil }
-        let existing = pending.filter { $0.identifier.hasPrefix(prefix) }
+        let existing = pending.filter { isReminderIdentifier($0.identifier) }
         let matchingIDs = Set(existing.compactMap { request -> String? in
             guard let plan = desired[request.identifier], matches(request, plan, calendar: calendar)
             else { return nil }
@@ -61,27 +63,47 @@ enum LocalNotificationReconciler {
         var firstError: String?
         for plan in activePlans where !matchingIDs.contains(plan.identifier) {
             guard !Task.isCancelled else { return nil }
-            let content = UNMutableNotificationContent()
-            content.title = plan.title
-            content.body = plan.body
-            content.sound = .default
-            content.userInfo = plan.userInfo
-            var components = calendar.dateComponents(
-                [.year, .month, .day, .hour, .minute], from: plan.fireDate
-            )
-            components.calendar = calendar
-            components.timeZone = calendar.timeZone
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-            let request = UNNotificationRequest(
-                identifier: plan.identifier, content: content, trigger: trigger
-            )
-            do { try await center.add(request) }
+            do { try await center.add(request(for: plan, calendar: calendar)) }
             catch { if firstError == nil { firstError = error.localizedDescription } }
         }
+        let activeTargets = enabled && authorized ? targets : []
+        let delivered = await center.deliveredNotifications()
+        let staleDelivered = delivered.compactMap { notification -> String? in
+            let request = notification.request
+            guard isReminderIdentifier(request.identifier) else { return nil }
+            return activeTargets.contains(where: {
+                $0.identifier == request.identifier
+                    && request.content.categoryIdentifier == $0.kind.rawValue
+                    && request.content.userInfo as? [String: String] == $0.userInfo
+            }) ? nil : request.identifier
+        }
+        center.removeDeliveredNotifications(withIdentifiers: staleDelivered)
         return firstError
     }
 
-    private static func matches(
+    static func request(for plan: LocalNotificationPlan, calendar: Calendar) -> UNNotificationRequest {
+        let content = UNMutableNotificationContent()
+        content.title = plan.title
+        content.body = plan.body
+        content.sound = .default
+        content.categoryIdentifier = plan.categoryIdentifier
+        content.userInfo = plan.userInfo
+        var components = calendar.dateComponents(
+            [.year, .month, .day, .hour, .minute], from: plan.fireDate
+        )
+        components.calendar = calendar
+        components.timeZone = calendar.timeZone
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        return UNNotificationRequest(identifier: plan.identifier, content: content, trigger: trigger)
+    }
+
+    private static func isReminderIdentifier(_ identifier: String) -> Bool {
+        [ReminderNotificationTarget.Kind.product, .salon].contains {
+            identifier.hasPrefix($0.identifierPrefix)
+        }
+    }
+
+    static func matches(
         _ request: UNNotificationRequest,
         _ plan: LocalNotificationPlan,
         calendar: Calendar
@@ -89,7 +111,9 @@ enum LocalNotificationReconciler {
         guard let trigger = request.trigger as? UNCalendarNotificationTrigger,
               !trigger.repeats,
               request.content.title == plan.title,
-              request.content.body == plan.body
+              request.content.body == plan.body,
+              request.content.categoryIdentifier == plan.categoryIdentifier,
+              request.content.userInfo as? [String: String] == plan.userInfo
         else { return false }
         let expected = calendar.dateComponents(
             [.year, .month, .day, .hour, .minute], from: plan.fireDate
