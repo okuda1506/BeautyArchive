@@ -79,7 +79,8 @@ final class ReminderNotificationCoordinator {
         }
     }
 
-    func takeActionError() -> String? {
+    func takeActionError(isForeground: Bool) -> String? {
+        guard isForeground else { return nil }
         let error = defaults.string(forKey: Self.actionErrorKey)
         defaults.removeObject(forKey: Self.actionErrorKey)
         return error

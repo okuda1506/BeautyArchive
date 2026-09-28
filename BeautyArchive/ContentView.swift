@@ -175,6 +175,10 @@ struct ContentView: View {
             if phase == .active {
                 scheduleNotificationReconciliation()
                 Task { await syncPendingGoogleAppointments() }
+            } else {
+                // The coordinator finishes queued work independently. Cancel the UI
+                // task so it cannot consume a saved action error after leaving active.
+                notificationTask?.cancel()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .googleCalendarConnectionChanged)) { _ in
@@ -222,7 +226,7 @@ struct ContentView: View {
             guard !Task.isCancelled else { return }
             let error = await ReminderNotificationCoordinator.shared.reconcile()
             guard !Task.isCancelled else { return }
-            let actionError = ReminderNotificationCoordinator.shared.takeActionError()
+            let actionError = ReminderNotificationCoordinator.shared.takeActionError(isForeground: scenePhase == .active)
             if let error = error ?? actionError {
                 contentAlert = ContentAlert(title: "通知を予約できませんでした", message: error)
             }

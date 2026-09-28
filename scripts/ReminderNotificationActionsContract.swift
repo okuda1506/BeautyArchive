@@ -172,8 +172,12 @@ struct ReminderNotificationActionsContract {
         scheduler.failAdd = true
         await coordinator.handle(response(target), now: now, calendar: calendar)
         expect(store.record(for: target.identifier) == beforeFailure, "Scheduling failure must restore the earlier snooze")
-        expect(coordinator.takeActionError() != nil, "Background failures must be available to the foreground UI")
-        expect(coordinator.takeActionError() == nil, "Action errors should be consumed once after presentation")
+        expect(coordinator.takeActionError(isForeground: false) == nil,
+               "Background reconciliation must not consume an error before the UI can present it")
+        expect(coordinator.takeActionError(isForeground: true) != nil,
+               "Background failures must remain available to the next foreground UI")
+        expect(coordinator.takeActionError(isForeground: true) == nil,
+               "Action errors should be consumed once after presentation")
         scheduler.failAdd = false
         let addedBeforeInvalid = scheduler.added
         await coordinator.handle(.init(actionIdentifier: UNNotificationDefaultActionIdentifier,
