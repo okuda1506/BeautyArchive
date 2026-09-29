@@ -11,6 +11,7 @@ struct SalonArchiveView: View {
     @State private var showingAdd = false
     @State private var copyingFrom: SalonVisit?
     @State private var errorMessage: String?
+    @State private var pendingDeletion: PendingDeletion?
     @State private var path: [UUID] = []
 
     var body: some View {
@@ -45,7 +46,7 @@ struct SalonArchiveView: View {
                                             .accessibilityHidden(true)
                                     }
                                     VStack(alignment: .leading, spacing: 5) {
-                                        Text(visit.date, format: .dateTime.year().month().day())
+                                        Text(visit.date, format: .dateTime.year().month().day().locale(JapanesePresentation.locale))
                                             .font(BOneTypography.rowTitle)
                                         Text(treatmentNames(for: visit))
                                             .font(.subheadline)
@@ -111,6 +112,7 @@ struct SalonArchiveView: View {
                     copyingTreatments: treatments.filter { $0.visitID == copyingFrom?.id }
                 )
             }
+            .confirmDeletion($pendingDeletion, delete: deleteConfirmed)
             .alert("保存できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -141,8 +143,18 @@ struct SalonArchiveView: View {
     }
 
     private func delete(at offsets: IndexSet) {
-        for index in offsets {
-            let visit = visits[index]
+        let selected = offsets.compactMap { visits.indices.contains($0) ? visits[$0] : nil }
+        guard !selected.isEmpty else { return }
+        pendingDeletion = PendingDeletion(
+            ids: selected.map(\.id),
+            names: selected.map { "\($0.date.japaneseFormatted(date: .abbreviated, time: .omitted)) · \(treatmentNames(for: $0))" },
+            consequence: "記録に含まれる施術と写真も削除します。"
+        )
+    }
+
+    private func deleteConfirmed(_ ids: [UUID]) {
+        let selectedIDs = Set(ids)
+        for visit in visits where selectedIDs.contains(visit.id) {
             for treatment in treatments where treatment.visitID == visit.id {
                 modelContext.delete(treatment)
             }
@@ -179,7 +191,7 @@ private struct SalonVisitDetail: View {
     var body: some View {
         List {
             Section("施術") {
-                LabeledContent("来店日", value: visit.date.formatted(date: .abbreviated, time: .omitted))
+                LabeledContent("来店日", value: visit.date.japaneseFormatted(date: .abbreviated, time: .omitted))
                 ForEach(treatments) { treatment in
                     LabeledContent(treatment.name, value: "\(treatment.cycleDays)日周期")
                 }
@@ -265,6 +277,10 @@ struct SalonVisitForm: View {
     @State private var removedPhotoIDs: Set<UUID> = []
     @State private var showingDetails: Bool
     @State private var errorMessage: String?
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable { case treatment(UUID), orderNote, salonName, stylistName, price, bookingURL, impression, nextVisitNote }
+
 
     init(
         visit: SalonVisit? = nil,
@@ -305,9 +321,29 @@ struct SalonVisitForm: View {
         _showingDetails = State(initialValue: visit != nil || copying != nil)
     }
 
+    private var draftSnapshot: FormDraftSnapshot {
+        FormDraftSnapshot(
+            text: [salonName, stylistName, orderNote, impression, nextVisitNote, bookingURL, priceText] + drafts.map(\.name),
+            dates: [date],
+            ids: drafts.map(\.id) + newPhotos.map(\.id) + removedPhotoIDs.sorted { $0.uuidString < $1.uuidString },
+            numbers: drafts.map(\.cycleDays)
+        )
+    }
+
+    private var validationMessage: String? {
+        if drafts.isEmpty || drafts.contains(where: { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+            return "保存するにはすべての施術名（必須）を入力してください。"
+        }
+        if hasDuplicateNames { return "同じ施術名をまとめると保存できます。" }
+        if !priceText.isEmpty && Int(priceText).map({ $0 >= 0 }) != true { return "詳細の金額を0以上の整数に直すと保存できます。" }
+        if !bookingURL.isEmpty && validBookingURL == nil { return "詳細の予約URLを確認すると保存できます。" }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                FormValidationHint(message: validationMessage)
                 if isCopyingPreviousVisit {
                     Text("前回のサロン・担当者・施術を引き継ぎました。今回の内容を確認して保存してください。")
                         .font(.subheadline)
@@ -316,7 +352,7 @@ struct SalonVisitForm: View {
                 Section("来店日") {
                     DatePicker("来店日", selection: $date, in: ...Date.now, displayedComponents: .date)
                     if let completingAppointment {
-                        Text("予約日時：\(completingAppointment.startAt.formatted(date: .abbreviated, time: .shortened))。実際の来店日と施術を確認してください。")
+                        Text("予約日時：\(completingAppointment.startAt.japaneseFormatted(date: .abbreviated, time: .shortened))。実際の来店日と施術を確認してください。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -325,7 +361,8 @@ struct SalonVisitForm: View {
                     ForEach($drafts) { $draft in
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
-                                TextField("施術名（例：カット）", text: $draft.name)
+                                TextField("施術名（必須・例：カット）", text: $draft.name)
+                                    .formField($focusedField, equals: .treatment(draft.id))
                                     .textInputAutocapitalization(.never)
                                 if drafts.count > 1 {
                                     Button("施術を削除", systemImage: "minus.circle") {
@@ -374,12 +411,16 @@ struct SalonVisitForm: View {
                 }
                 Section("オーダー（任意）") {
                     TextField("オーダー", text: $orderNote, axis: .vertical)
+                        .formField($focusedField, equals: .orderNote, last: !showingDetails)
                 }
                 Section {
                     DisclosureGroup(isExpanded: $showingDetails) {
                         TextField("店名", text: $salonName)
+                            .formField($focusedField, equals: .salonName)
                         TextField("担当者", text: $stylistName)
+                            .formField($focusedField, equals: .stylistName)
                         TextField("金額", text: $priceText)
+                            .formField($focusedField, equals: .price)
                             .keyboardType(.numberPad)
                         if !priceText.isEmpty && Int(priceText).map({ $0 >= 0 }) != true {
                             Text("金額は0以上の数字で入力してください。")
@@ -387,6 +428,7 @@ struct SalonVisitForm: View {
                                 .foregroundStyle(.red)
                         }
                         TextField("予約URL", text: $bookingURL)
+                            .formField($focusedField, equals: .bookingURL)
                             .keyboardType(.URL)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -396,7 +438,9 @@ struct SalonVisitForm: View {
                                 .foregroundStyle(.red)
                         }
                         TextField("感想", text: $impression, axis: .vertical)
+                            .formField($focusedField, equals: .impression)
                         TextField("次回のメモ", text: $nextVisitNote, axis: .vertical)
+                            .formField($focusedField, equals: .nextVisitNote, last: true)
                     } label: {
                         Label("サロン情報・感想などの詳細", systemImage: "slider.horizontal.3")
                     }
@@ -404,10 +448,9 @@ struct SalonVisitForm: View {
             }
             .navigationTitle(visit == nil ? "美容院の記録を追加" : "美容院の記録を編集")
             .navigationBarTitleDisplayMode(.inline)
+            .guardUnsavedDraft(draftSnapshot)
+            .formKeyboard($focusedField, fields: drafts.map { .treatment($0.id) } + [.orderNote] + (showingDetails ? [.salonName, .stylistName, .price, .bookingURL, .impression, .nextVisitNote] : []))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { save() }
                         .disabled(!isValid)

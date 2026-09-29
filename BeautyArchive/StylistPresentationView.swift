@@ -41,7 +41,7 @@ struct StylistPresentationView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     sectionTitle("前回の仕上がり")
                     if let previousVisit, !previousPhotos.isEmpty {
-                        Text(previousVisit.date, format: .dateTime.year().month().day())
+                        Text(previousVisit.date, format: .dateTime.year().month().day().locale(JapanesePresentation.locale))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         PhotoGallery(photos: previousPhotos, thumbnailSize: 240)

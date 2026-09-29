@@ -158,7 +158,7 @@ struct HomeRecentRecordsSection: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(record.category)
                         .font(BOneTypography.eyebrow)
-                    Text(record.date, format: .dateTime.year().month().day())
+                    Text(record.date, format: .dateTime.year().month().day().locale(JapanesePresentation.locale))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(record.summary)
@@ -178,7 +178,7 @@ struct HomeRecentRecordsSection: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(record.category)、\(record.date.formatted(.dateTime.year().month().day()))、\(record.summary)")
+        .accessibilityLabel("\(record.category)、\(record.date.formatted(.dateTime.year().month().day().locale(JapanesePresentation.locale)))、\(record.summary)")
         .accessibilityHint("記録の詳細を開く")
     }
 

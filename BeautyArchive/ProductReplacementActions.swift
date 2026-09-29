@@ -8,7 +8,7 @@ enum ProductReplacementActions {
                   let estimate = ReplacementEstimate.calculate(for: unit, among: units),
                   let openedAt = unit.openedAt
             else { return nil }
-            let openedDate = openedAt.formatted(date: .abbreviated, time: .omitted)
+            let openedDate = openedAt.japaneseFormatted(date: .abbreviated, time: .omitted)
             return HomeAction(
                 id: unit.id,
                 kind: .itemReplacement,

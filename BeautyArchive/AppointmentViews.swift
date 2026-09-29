@@ -12,6 +12,7 @@ struct AppointmentListView: View {
     @State private var showingAddSalon = false
     @State private var showingAddPurchase = false
     @State private var errorMessage: String?
+    @State private var pendingDeletion: PendingDeletion?
     @State private var googleEvents: [GoogleCalendarEvent] = []
     @State private var googleEventsMonth: Date?
     @State private var isGoogleConnected = false
@@ -66,7 +67,7 @@ struct AppointmentListView: View {
                 )
                     .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
 
-                Section(selectedDate.formatted(date: .complete, time: .omitted)) {
+                Section(selectedDate.japaneseFormatted(date: .complete, time: .omitted)) {
                     if selectedAppointments.isEmpty && selectedPurchasePlans.isEmpty
                         && selectedGoogleEvents.isEmpty
                         && !isLoadingGoogleEvents && googleErrorMessage == nil {
@@ -151,7 +152,7 @@ struct AppointmentListView: View {
                 }
             }
             .sheet(isPresented: $showingAddSalon) {
-                AppointmentForm { selectedDate = $0 }
+                AppointmentForm(suggestedDate: selectedDate) { selectedDate = $0 }
             }
             .sheet(isPresented: $showingAddPurchase) {
                 PurchasePlanForm(suggestedDate: selectedDate) { selectedDate = $0 }
@@ -176,6 +177,7 @@ struct AppointmentListView: View {
                     Task { await syncGooglePending() }
                 }
             }
+            .confirmDeletion($pendingDeletion, delete: deleteConfirmed)
             .alert("削除できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -202,7 +204,7 @@ struct AppointmentListView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Text(appointment.startAt, format: .dateTime.hour().minute())
+            Text(appointment.startAt, format: .dateTime.hour().minute().locale(JapanesePresentation.locale))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             let names = treatments.filter { $0.appointmentID == appointment.id }
@@ -226,7 +228,7 @@ struct AppointmentListView: View {
             Text(event.title).font(BOneTypography.rowTitle)
             Text(event.isAllDay
                  ? "終日"
-                 : "\(event.startAt.formatted(date: .abbreviated, time: .shortened))〜\(event.endAt.formatted(date: .abbreviated, time: .shortened))")
+                 : "\(event.startAt.japaneseFormatted(date: .abbreviated, time: .shortened))〜\(event.endAt.japaneseFormatted(date: .abbreviated, time: .shortened))")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Label("Googleカレンダー · 表示のみ", systemImage: "calendar")
@@ -247,7 +249,7 @@ struct AppointmentListView: View {
                     .foregroundStyle(.secondary)
             }
             Label(
-                "\(plan.category.title) · \(plan.hasTime ? plan.plannedAt.formatted(date: .omitted, time: .shortened) : "終日")",
+                "\(plan.category.title) · \(plan.hasTime ? plan.plannedAt.japaneseFormatted(date: .omitted, time: .shortened) : "終日")",
                 systemImage: "bag"
             )
             .font(.subheadline)
@@ -322,8 +324,23 @@ struct AppointmentListView: View {
     }
 
     private func delete(at offsets: IndexSet) {
-        for index in offsets {
-            let appointment = selectedAppointments[index]
+        let selected = offsets.compactMap { selectedAppointments.indices.contains($0) ? selectedAppointments[$0] : nil }
+        guard !selected.isEmpty else { return }
+        let includesGoogle = selected.contains { appointment in
+            googleLinks.contains { $0.appointmentID == appointment.id }
+        }
+        pendingDeletion = PendingDeletion(
+            ids: selected.map(\.id),
+            names: selected.map { "\($0.title)（\($0.startAt.japaneseFormatted(date: .abbreviated, time: .shortened))）" },
+            consequence: "予定と施術情報を削除します。"
+                + (includesGoogle ? "連携したGoogleカレンダーの予定も削除します。" : "")
+                + "外部サービスの予約はキャンセルされません。"
+        )
+    }
+
+    private func deleteConfirmed(_ ids: [UUID]) {
+        let selectedIDs = Set(ids)
+        for appointment in appointments where selectedIDs.contains(appointment.id) {
             for treatment in treatments where treatment.appointmentID == appointment.id {
                 modelContext.delete(treatment)
             }
@@ -354,7 +371,7 @@ private struct MonthCalendarView: View {
     let purchasePlans: [ProductPurchasePlan]
     let googleEvents: [GoogleCalendarEvent]
 
-    private let calendar = Calendar.current
+    private let calendar = JapanesePresentation.calendar
     private let weekCount = 6
 
     private var monthStart: Date {
@@ -382,7 +399,7 @@ private struct MonthCalendarView: View {
                 Button("前の月", systemImage: "chevron.left") { changeMonth(by: -1) }
                     .labelStyle(.iconOnly)
                 Spacer()
-                Text(monthStart, format: .dateTime.year().month())
+                Text(monthStart, format: .dateTime.year().month().locale(JapanesePresentation.locale))
                     .font(.headline)
                 Spacer()
                 Button("次の月", systemImage: "chevron.right") { changeMonth(by: 1) }
@@ -424,7 +441,7 @@ private struct MonthCalendarView: View {
             selectedDate = date
         } label: {
             VStack(spacing: 3) {
-                Text(date, format: .dateTime.day())
+                Text(date, format: .dateTime.day().locale(JapanesePresentation.locale))
                     .font(.subheadline)
                     .foregroundStyle(isSelected ? Color(uiColor: .systemBackground) : Color.primary)
                     .frame(width: 34, height: 34)
@@ -447,7 +464,7 @@ private struct MonthCalendarView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
-            "\(date.formatted(date: .complete, time: .omitted))"
+            "\(date.japaneseFormatted(date: .complete, time: .omitted))"
             + (hasAppointment ? "、B/ONEの予定あり" : "")
             + (hasPurchasePlan ? "、購入予定あり" : "")
             + (hasGoogleEvent ? "、Googleの予定あり" : "")
@@ -483,8 +500,8 @@ private struct AppointmentDetail: View {
             Section("予約") {
                 LabeledContent("状態", value: appointment.isCancelled
                     ? "キャンセル済み" : appointment.isCompleted ? "記録済み" : "予約済み")
-                LabeledContent("開始", value: appointment.startAt.formatted(date: .abbreviated, time: .shortened))
-                LabeledContent("終了", value: appointment.endAt.formatted(date: .abbreviated, time: .shortened))
+                LabeledContent("開始", value: appointment.startAt.japaneseFormatted(date: .abbreviated, time: .shortened))
+                LabeledContent("終了", value: appointment.endAt.japaneseFormatted(date: .abbreviated, time: .shortened))
                 if !appointment.shopName.isEmpty {
                     LabeledContent("店舗", value: appointment.shopName)
                 }
@@ -591,10 +608,15 @@ struct AppointmentForm: View {
     @State private var statusRaw: String
     @State private var drafts: [AppointmentTreatmentDraft]
     @State private var errorMessage: String?
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable { case title, shopName, treatment(UUID), note }
+
     @State private var googleAccount: GoogleAccountIdentity?
     @State private var isLoadingGoogleAccount = true
     @State private var googleLinkLoaded = false
     @State private var syncToGoogle = false
+    @State private var initialGoogleSync: Bool?
 
     private var existingGoogleLink: GoogleAppointmentLink? {
         guard let appointment else { return nil }
@@ -604,6 +626,7 @@ struct AppointmentForm: View {
     init(
         appointment: BeautyAppointment? = nil,
         treatments: [AppointmentTreatment] = [],
+        suggestedDate: Date? = nil,
         suggestedTitle: String = "",
         suggestedShopName: String = "",
         suggestedTreatmentName: String = "",
@@ -613,7 +636,7 @@ struct AppointmentForm: View {
         self.existingTreatments = treatments
         self.isExternalBookingDraft = appointment == nil && !suggestedTreatmentName.isEmpty
         self.onSave = onSave
-        let defaultStart = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now
+        let defaultStart = AppointmentFormTiming.initialStart(selectedDay: suggestedDate)
         _title = State(initialValue: appointment?.title ?? suggestedTitle)
         _startAt = State(initialValue: appointment?.startAt ?? defaultStart)
         _endAt = State(initialValue: appointment?.endAt ?? defaultStart.addingTimeInterval(3600))
@@ -625,16 +648,38 @@ struct AppointmentForm: View {
             : treatments.map { AppointmentTreatmentDraft(id: $0.id, name: $0.name) })
     }
 
+    private var draftSnapshot: FormDraftSnapshot {
+        FormDraftSnapshot(
+            text: [title, shopName, note, statusRaw] + drafts.map(\.name),
+            dates: [startAt, endAt],
+            flags: [syncToGoogle != (initialGoogleSync ?? false)],
+            ids: drafts.map(\.id)
+        )
+    }
+
+    private var validationMessage: String? {
+        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "保存するには予定名（必須）を入力してください。" }
+        if endAt <= startAt { return "終了日時を開始日時より後にすると保存できます。" }
+        if drafts.isEmpty || drafts.contains(where: { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+            return "すべての施術名（必須）を入力してください。"
+        }
+        if hasDuplicateNames { return "同じ施術名をまとめると保存できます。" }
+        if !googleLinkLoaded { return "連携状態を確認すると保存できます。" }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                FormValidationHint(message: validationMessage)
                 Section("予定") {
                     if isExternalBookingDraft {
                         Text("予約先で確定した日時を入力してください。ここで保存しても、予約先の日時は変更されません。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    TextField("予定名（例：美容院）", text: $title)
+                    TextField("予定名（必須・例：美容院）", text: $title)
+                        .formField($focusedField, equals: .title)
                     DatePicker("開始", selection: $startAt)
                     DatePicker("終了", selection: $endAt)
                     if endAt <= startAt {
@@ -643,6 +688,7 @@ struct AppointmentForm: View {
                             .foregroundStyle(.red)
                     }
                     TextField("店舗（任意）", text: $shopName)
+                        .formField($focusedField, equals: .shopName)
                     Picker("状態", selection: $statusRaw) {
                         Text("予約済み").tag("booked")
                         Text("キャンセル済み").tag("cancelled")
@@ -660,7 +706,8 @@ struct AppointmentForm: View {
                 Section("対象の施術") {
                     ForEach($drafts) { $draft in
                         HStack {
-                            TextField("施術名（例：カット）", text: $draft.name)
+                            TextField("施術名（必須・例：カット）", text: $draft.name)
+                                .formField($focusedField, equals: .treatment(draft.id))
                             if drafts.count > 1 {
                                 Button("施術を削除", systemImage: "minus.circle") {
                                     drafts.removeAll { $0.id == draft.id }
@@ -681,6 +728,7 @@ struct AppointmentForm: View {
                 }
                 Section("メモ（任意）") {
                     TextField("予約時のメモ", text: $note, axis: .vertical)
+                        .formField($focusedField, equals: .note, last: true)
                 }
                 if googleLinkLoaded && (googleAccount != nil || existingGoogleLink != nil) {
                     Section("Googleカレンダー") {
@@ -701,18 +749,21 @@ struct AppointmentForm: View {
                     Section("Googleカレンダー") { ProgressView("連携状態を確認中") }
                 }
             }
-            .onChange(of: startAt) { _, newStart in
-                if endAt <= newStart { endAt = newStart.addingTimeInterval(3600) }
+            .onChange(of: startAt) { oldStart, newStart in
+                endAt = AppointmentFormTiming.endAfterMovingStart(from: oldStart, to: newStart, end: endAt)
             }
             .onChange(of: statusRaw) { _, newStatus in
                 if newStatus == "cancelled" { syncToGoogle = false }
             }
             .navigationTitle(appointment == nil ? "美容予定を追加" : "美容予定を編集")
             .navigationBarTitleDisplayMode(.inline)
+            .guardUnsavedDraft(draftSnapshot)
+            .formKeyboard($focusedField, fields: [.title, .shopName] + drafts.map { .treatment($0.id) } + [.note])
             .onAppear {
                 if !googleLinkLoaded {
-                    syncToGoogle = statusRaw != "cancelled"
+                    initialGoogleSync = statusRaw != "cancelled"
                         && (existingGoogleLink.map { !$0.state.isDeletion } ?? false)
+                    syncToGoogle = initialGoogleSync ?? false
                     googleLinkLoaded = true
                 }
             }
@@ -721,9 +772,6 @@ struct AppointmentForm: View {
                 isLoadingGoogleAccount = false
             }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { save() }.disabled(!isValid || !googleLinkLoaded)
                 }
