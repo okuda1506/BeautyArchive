@@ -8,6 +8,7 @@ struct HairReferenceListView: View {
     @Query private var allPhotos: [ReferencePhoto]
     @State private var showingAdd = false
     @State private var errorMessage: String?
+    @State private var pendingDeletion: PendingDeletion?
 
     var body: some View {
         Group {
@@ -64,6 +65,7 @@ struct HairReferenceListView: View {
             }
         }
         .sheet(isPresented: $showingAdd) { HairReferenceForm() }
+        .confirmDeletion($pendingDeletion, delete: deleteConfirmed)
         .alert("削除できませんでした", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -80,8 +82,17 @@ struct HairReferenceListView: View {
     }
 
     private func delete(at offsets: IndexSet) {
-        for index in offsets {
-            let reference = references[index]
+        let selected = offsets.compactMap { references.indices.contains($0) ? references[$0] : nil }
+        guard !selected.isEmpty else { return }
+        pendingDeletion = PendingDeletion(
+            ids: selected.map(\.id), names: selected.map(\.title),
+            consequence: "この参考スタイルの写真とオーダーメモも削除します。"
+        )
+    }
+
+    private func deleteConfirmed(_ ids: [UUID]) {
+        let selectedIDs = Set(ids)
+        for reference in references where selectedIDs.contains(reference.id) {
             for photo in allPhotos where photo.referenceID == reference.id {
                 modelContext.delete(photo)
             }
@@ -149,6 +160,10 @@ struct HairReferenceForm: View {
     @State private var newPhotos: [PhotoDraft] = []
     @State private var removedPhotoIDs: Set<UUID> = []
     @State private var errorMessage: String?
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable { case title, memo, sourceURL }
+
 
     init(reference: HairStyleReference? = nil) {
         self.reference = reference
@@ -157,11 +172,26 @@ struct HairReferenceForm: View {
         _sourceURL = State(initialValue: reference?.sourceURL ?? "")
     }
 
+    private var draftSnapshot: FormDraftSnapshot {
+        FormDraftSnapshot(
+            text: [title, memo, sourceURL],
+            ids: newPhotos.map(\.id) + removedPhotoIDs.sorted { $0.uuidString < $1.uuidString }
+        )
+    }
+
+    private var validationMessage: String? {
+        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "保存するにはタイトル（必須）を入力してください。" }
+        if !sourceURL.isEmpty && validSourceURL(sourceURL) == nil { return "参考元のURLを確認すると保存できます。" }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("タイトル") {
+                FormValidationHint(message: validationMessage)
+                Section("タイトル（必須）") {
                     TextField("例：次回のショートスタイル", text: $title)
+                        .formField($focusedField, equals: .title)
                 }
                 Section("参考写真") {
                     PhotoEditor(
@@ -172,10 +202,12 @@ struct HairReferenceForm: View {
                 }
                 Section("オーダーメモ（任意）") {
                     TextField("前髪・サイド・カラーなど", text: $memo, axis: .vertical)
+                        .formField($focusedField, equals: .memo)
                         .lineLimit(3...8)
                 }
                 Section("参考元（任意）") {
                     TextField("https://", text: $sourceURL)
+                        .formField($focusedField, equals: .sourceURL, last: true)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -188,10 +220,9 @@ struct HairReferenceForm: View {
             }
             .navigationTitle(reference == nil ? "参考スタイルを追加" : "参考スタイルを編集")
             .navigationBarTitleDisplayMode(.inline)
+            .guardUnsavedDraft(draftSnapshot)
+            .formKeyboard($focusedField, fields: [.title, .memo, .sourceURL])
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { save() }.disabled(!isValid)
                 }

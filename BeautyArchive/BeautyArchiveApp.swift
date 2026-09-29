@@ -42,6 +42,7 @@ struct BeautyArchiveApp: App {
                     }
                 }
             }
+            .environment(\.locale, JapanesePresentation.locale)
             .environment(reminderTiming)
             .onReceive(NotificationCenter.default.publisher(
                 for: NSUbiquitousKeyValueStore.didChangeExternallyNotification

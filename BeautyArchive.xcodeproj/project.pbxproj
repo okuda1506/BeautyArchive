@@ -195,9 +195,10 @@
 				};
 			};
 			buildConfigurationList = 1718B12D30551E2B00DADE5C /* Build configuration list for PBXProject "BeautyArchive" */;
-			developmentRegion = en;
+			developmentRegion = ja;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				ja,
 				en,
 				Base,
 			);

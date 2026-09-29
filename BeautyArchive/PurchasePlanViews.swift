@@ -17,6 +17,10 @@ struct PurchasePlanForm: View {
     @State private var purchaseURL: String
     @State private var note: String
     @State private var errorMessage: String?
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable { case productName, vendor, purchaseURL, note }
+
 
     init(
         plan: ProductPurchasePlan? = nil,
@@ -60,9 +64,23 @@ struct PurchasePlanForm: View {
             && components.user == nil && components.password == nil
     }
 
+    private var draftSnapshot: FormDraftSnapshot {
+        FormDraftSnapshot(
+            text: [category.rawValue, productName, vendor, purchaseURL, note], dates: [plannedAt],
+            flags: [hasTime], ids: selectedProductID.map { [$0] } ?? []
+        )
+    }
+
+    private var validationMessage: String? {
+        if resolvedName.isEmpty { return "保存するには商品名（必須）を入力するか、登録済みの商品を選んでください。" }
+        if !isValidURL { return "購入先のURLをHTTPS形式に直すと保存できます。" }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                FormValidationHint(message: validationMessage)
                 Section("購入するもの") {
                     Picker("カテゴリ", selection: $category) {
                         ForEach(ProductCategory.allCases) { value in
@@ -78,7 +96,8 @@ struct PurchasePlanForm: View {
                         }
                     }
                     if selectedProduct == nil {
-                        TextField("商品名", text: $productName)
+                        TextField("商品名（必須）", text: $productName)
+                            .formField($focusedField, equals: .productName)
                     }
                 }
                 Section("購入予定日") {
@@ -94,7 +113,9 @@ struct PurchasePlanForm: View {
                 }
                 Section("購入先（任意）") {
                     TextField("店舗・サイト", text: $vendor)
+                        .formField($focusedField, equals: .vendor)
                     TextField("https://", text: $purchaseURL)
+                        .formField($focusedField, equals: .purchaseURL)
                         .textContentType(.URL)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
@@ -107,10 +128,13 @@ struct PurchasePlanForm: View {
                 }
                 Section("メモ（任意）") {
                     TextField("購入予定についてのメモ", text: $note, axis: .vertical)
+                        .formField($focusedField, equals: .note, last: true)
                 }
             }
             .navigationTitle(plan == nil ? "購入予定を追加" : "購入予定を編集")
             .navigationBarTitleDisplayMode(.inline)
+            .guardUnsavedDraft(draftSnapshot)
+            .formKeyboard($focusedField, fields: (selectedProduct == nil ? [.productName] : []) + [.vendor, .purchaseURL, .note])
             .onChange(of: category) { _, newCategory in
                 if let product = products.first(where: { $0.id == selectedProductID }),
                    product.category != newCategory {
@@ -126,9 +150,6 @@ struct PurchasePlanForm: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { save() }
                         .disabled(resolvedName.isEmpty || !isValidURL)
@@ -204,11 +225,11 @@ struct PurchasePlanDetail: View {
                 LabeledContent(
                     "予定",
                     value: plan.hasTime
-                        ? plan.plannedAt.formatted(date: .abbreviated, time: .shortened)
-                        : plan.plannedAt.formatted(date: .abbreviated, time: .omitted)
+                        ? plan.plannedAt.japaneseFormatted(date: .abbreviated, time: .shortened)
+                        : plan.plannedAt.japaneseFormatted(date: .abbreviated, time: .omitted)
                 )
                 if let purchasedAt = plan.purchasedAt {
-                    LabeledContent("購入日", value: purchasedAt.formatted(date: .abbreviated, time: .omitted))
+                    LabeledContent("購入日", value: purchasedAt.japaneseFormatted(date: .abbreviated, time: .omitted))
                 }
                 if !plan.vendor.isEmpty { LabeledContent("購入先", value: plan.vendor) }
                 if let url = plan.validPurchaseURL {
@@ -220,7 +241,7 @@ struct PurchasePlanDetail: View {
             }
             if let completedUnit, let completedProduct {
                 Section("購入履歴") {
-                    NavigationLink("購入した1本の記録を見る") {
+                    NavigationLink("購入・使用情報を見る") {
                         ProductUnitDetail(unit: completedUnit, product: completedProduct)
                     }
                 }
@@ -252,8 +273,8 @@ struct PurchasePlanDetail: View {
             PurchaseCompletionForm(plan: plan)
         }
         .confirmationDialog(
-            "この購入予定を削除しますか？",
-            isPresented: $showingDelete
+            "「\(plan.productName)」の購入予定を削除しますか？",
+            isPresented: $showingDelete, titleVisibility: .visible
         ) {
             Button("予定を削除", role: .destructive) { deletePlan() }
         } message: {
@@ -302,6 +323,10 @@ private struct PurchaseCompletionForm: View {
     @State private var vendor: String
     @State private var priceText = ""
     @State private var errorMessage: String?
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable { case vendor, price }
+
 
     init(plan: ProductPurchasePlan) {
         self.plan = plan
@@ -316,9 +341,20 @@ private struct PurchaseCompletionForm: View {
         trimmedPrice.isEmpty || Int(trimmedPrice).map { $0 >= 0 } == true
     }
 
+    private var draftSnapshot: FormDraftSnapshot {
+        FormDraftSnapshot(text: [vendor, priceText], dates: [purchasedAt])
+    }
+
+    private var validationMessage: String? {
+        if !isValidPrice { return "価格を0以上の整数に直すと記録できます。" }
+        if plan.status != .planned { return "この予定は購入記録の対象外です。" }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                FormValidationHint(message: validationMessage)
                 Section("購入した商品") {
                     LabeledContent("商品", value: plan.productName)
                     LabeledContent("カテゴリ", value: plan.category.title)
@@ -326,7 +362,9 @@ private struct PurchaseCompletionForm: View {
                 Section("実際の購入") {
                     DatePicker("購入日", selection: $purchasedAt, displayedComponents: .date)
                     TextField("購入先（任意）", text: $vendor)
+                        .formField($focusedField, equals: .vendor)
                     TextField("価格（円・任意）", text: $priceText)
+                        .formField($focusedField, equals: .price, last: true)
                         .keyboardType(.numberPad)
                     if !isValidPrice {
                         Text("価格は0以上の整数で入力してください。")
@@ -340,10 +378,9 @@ private struct PurchaseCompletionForm: View {
             }
             .navigationTitle("購入済みにする")
             .navigationBarTitleDisplayMode(.inline)
+            .guardUnsavedDraft(draftSnapshot)
+            .formKeyboard($focusedField, fields: [.vendor, .price])
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("記録する") { complete() }
                         .disabled(!isValidPrice || plan.status != .planned)

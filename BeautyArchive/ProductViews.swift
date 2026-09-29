@@ -36,6 +36,7 @@ struct ProductListView: View {
     @Query private var units: [ProductUnit]
     @State private var showingAdd = false
     @State private var errorMessage: String?
+    @State private var pendingDeletion: PendingDeletion?
     @State private var path: [UUID] = []
     @State private var searchText = ""
     @State private var statusFilter: ProductStatusFilter = .all
@@ -144,6 +145,7 @@ struct ProductListView: View {
                 }
             }
             .sheet(isPresented: $showingAdd) { ProductForm() }
+            .confirmDeletion($pendingDeletion, delete: deleteConfirmed)
             .alert("削除できませんでした", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -174,8 +176,17 @@ struct ProductListView: View {
     }
 
     private func delete(_ offsets: IndexSet, from categoryProducts: [BeautyProduct]) {
-        for index in offsets {
-            let product = categoryProducts[index]
+        let selected = offsets.compactMap { categoryProducts.indices.contains($0) ? categoryProducts[$0] : nil }
+        guard !selected.isEmpty else { return }
+        pendingDeletion = PendingDeletion(
+            ids: selected.map(\.id), names: selected.map(\.name),
+            consequence: "商品画像と、この商品の購入・使用履歴も削除します。"
+        )
+    }
+
+    private func deleteConfirmed(_ ids: [UUID]) {
+        let selectedIDs = Set(ids)
+        for product in products where selectedIDs.contains(product.id) {
             for unit in units where unit.productID == product.id { modelContext.delete(unit) }
             modelContext.delete(product)
         }
@@ -194,6 +205,7 @@ private struct ProductDetail: View {
     @State private var showingEdit = false
     @State private var showingAddUnit = false
     @State private var errorMessage: String?
+    @State private var pendingDeletion: PendingDeletion?
 
     private var units: [ProductUnit] {
         allUnits.filter { $0.productID == product.id }
@@ -218,7 +230,7 @@ private struct ProductDetail: View {
             }
             Section("購入・使用履歴") {
                 if units.isEmpty {
-                    Text("登録した1本はまだありません")
+                    Text("購入・使用情報はまだ登録されていません")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(units) { unit in
@@ -229,12 +241,12 @@ private struct ProductDetail: View {
                                 Text(unit.status.title)
                                     .font(BOneTypography.rowTitle)
                                 if let purchasedAt = unit.purchasedAt {
-                                    Text(purchasedAt, format: .dateTime.year().month().day())
+                                    Text(purchasedAt, format: .dateTime.year().month().day().locale(JapanesePresentation.locale))
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                 }
                                 if let estimate = ReplacementEstimate.calculate(for: unit, among: allUnits) {
-                                    Text("買い替え目安：\(estimate.date.formatted(date: .abbreviated, time: .omitted))")
+                                    Text("買い替え目安：\(estimate.date.japaneseFormatted(date: .abbreviated, time: .omitted))")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -243,7 +255,7 @@ private struct ProductDetail: View {
                     }
                     .onDelete(perform: deleteUnits)
                 }
-                Button("もう1本登録", systemImage: "plus") { showingAddUnit = true }
+                Button(units.isEmpty ? "購入・使用情報を登録" : "同じ商品を追加", systemImage: "plus") { showingAddUnit = true }
             }
             if let url = product.validPurchaseURL {
                 Section("再購入") {
@@ -263,7 +275,8 @@ private struct ProductDetail: View {
             }
         }
         .sheet(isPresented: $showingEdit) { ProductForm(product: product) }
-        .sheet(isPresented: $showingAddUnit) { ProductUnitForm(product: product) }
+        .sheet(isPresented: $showingAddUnit) { ProductUnitForm(product: product, isAdditional: !units.isEmpty) }
+        .confirmDeletion($pendingDeletion, delete: deleteConfirmed)
         .alert("削除できませんでした", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -275,7 +288,21 @@ private struct ProductDetail: View {
     }
 
     private func deleteUnits(at offsets: IndexSet) {
-        for index in offsets { modelContext.delete(units[index]) }
+        let selected = offsets.compactMap { units.indices.contains($0) ? units[$0] : nil }
+        guard !selected.isEmpty else { return }
+        pendingDeletion = PendingDeletion(
+            ids: selected.map(\.id),
+            names: selected.map {
+                product.name + " · " + $0.status.title
+                    + ($0.purchasedAt.map { "（\($0.japaneseFormatted(date: .abbreviated, time: .omitted))購入）" } ?? "")
+            },
+            consequence: "選択した購入・使用履歴を削除します。商品情報は残ります。"
+        )
+    }
+
+    private func deleteConfirmed(_ ids: [UUID]) {
+        let selectedIDs = Set(ids)
+        for unit in units where selectedIDs.contains(unit.id) { modelContext.delete(unit) }
         do { try modelContext.save() }
         catch {
             modelContext.rollback()
@@ -476,10 +503,15 @@ struct ProductForm: View {
     @State private var imageData: Data
     @State private var selectedImage: PhotosPickerItem?
     @State private var isLoadingImage = false
+    @State private var draftIsClosed = false
     @State private var suppressAutomaticImageFetch = false
     @State private var imageReview: ProductImageReview?
     @State private var showingImageFetchFailure = false
     @State private var errorMessage: String?
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable { case name, brand, purchaseURL, note }
+
 
     init(product: BeautyProduct? = nil) {
         self.product = product
@@ -509,12 +541,26 @@ struct ProductForm: View {
             && (trimmedURL.isEmpty || validPurchaseURL != nil)
     }
 
+    private var draftSnapshot: FormDraftSnapshot {
+        FormDraftSnapshot(text: [name, brand, category.rawValue, purchaseURL, note], images: [imageData])
+    }
+
+    private var validationMessage: String? {
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "保存するには商品名（必須）を入力してください。" }
+        if !trimmedURL.isEmpty && validPurchaseURL == nil { return "購入先のURLをHTTPS形式に直すと保存できます。" }
+        if isLoadingImage { return "画像の読み込みが終わると保存できます。" }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                FormValidationHint(message: validationMessage)
                 Section("商品") {
-                    TextField("商品名", text: $name)
+                    TextField("商品名（必須）", text: $name)
+                        .formField($focusedField, equals: .name)
                     TextField("ブランド（任意）", text: $brand)
+                        .formField($focusedField, equals: .brand)
                     Picker("カテゴリ", selection: $category) {
                         ForEach(ProductCategory.allCases) { category in
                             Text(category.title).tag(category)
@@ -556,6 +602,7 @@ struct ProductForm: View {
                 }
                 Section("再購入先（任意）") {
                     TextField("https://", text: $purchaseURL)
+                        .formField($focusedField, equals: .purchaseURL)
                         .textContentType(.URL)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
@@ -568,6 +615,7 @@ struct ProductForm: View {
                 }
                 Section("メモ（任意）") {
                     TextField("商品についてのメモ", text: $note, axis: .vertical)
+                        .formField($focusedField, equals: .note, last: true)
                 }
             }
             .alert("商品画像を取得できませんでした", isPresented: $showingImageFetchFailure) {
@@ -581,10 +629,9 @@ struct ProductForm: View {
             }
             .navigationTitle(product == nil ? "商品を追加" : "商品を編集")
             .navigationBarTitleDisplayMode(.inline)
+            .guardUnsavedDraft(draftSnapshot, onDiscard: { draftIsClosed = true })
+            .formKeyboard($focusedField, fields: [.name, .brand, .purchaseURL, .note])
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { save() }.disabled(!isValid || isLoadingImage)
                 }
@@ -633,6 +680,7 @@ struct ProductForm: View {
                 errorMessage = "画像を読み込めませんでした。別の画像を選んでください。"
                 return
             }
+            guard !draftIsClosed else { return }
             imageData = optimized
             suppressAutomaticImageFetch = false
         } catch {
@@ -646,7 +694,7 @@ struct ProductForm: View {
         isLoadingImage = true
         defer { isLoadingImage = false }
         let candidates = await ProductImageFetcher.fetchCandidates(from: url)
-        guard validPurchaseURL == url else { return }
+        guard !draftIsClosed, validPurchaseURL == url else { return }
         guard !candidates.isEmpty else {
             showImageFetchFailure(saveAfterReview: saveAfterReview)
             return

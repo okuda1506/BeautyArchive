@@ -16,13 +16,13 @@ struct ProductUnitDetail: View {
             Section("使用状況") {
                 LabeledContent("状態", value: unit.status.title)
                 if let purchasedAt = unit.purchasedAt {
-                    LabeledContent("購入日", value: purchasedAt.formatted(date: .abbreviated, time: .omitted))
+                    LabeledContent("購入日", value: purchasedAt.japaneseFormatted(date: .abbreviated, time: .omitted))
                 }
                 if let openedAt = unit.openedAt {
-                    LabeledContent("開封日", value: openedAt.formatted(date: .abbreviated, time: .omitted))
+                    LabeledContent("開封日", value: openedAt.japaneseFormatted(date: .abbreviated, time: .omitted))
                 }
                 if let finishedAt = unit.finishedAt {
-                    LabeledContent("使い切り日", value: finishedAt.formatted(date: .abbreviated, time: .omitted))
+                    LabeledContent("使い切り日", value: finishedAt.japaneseFormatted(date: .abbreviated, time: .omitted))
                 }
             }
             if unit.priceYen != nil || !unit.purchasedFrom.isEmpty {
@@ -37,7 +37,7 @@ struct ProductUnitDetail: View {
             }
             if let estimate = replacementEstimate {
                 Section("買い替え目安") {
-                    LabeledContent("日付", value: estimate.date.formatted(date: .abbreviated, time: .omitted))
+                    LabeledContent("日付", value: estimate.date.japaneseFormatted(date: .abbreviated, time: .omitted))
                     LabeledContent("使用日数", value: "\(estimate.usageDays)日")
                     LabeledContent("根拠", value: estimate.source.title)
                     LabeledContent(
@@ -50,7 +50,7 @@ struct ProductUnitDetail: View {
                 Section("メモ") { Text(unit.note) }
             }
         }
-        .navigationTitle("1本の記録")
+        .navigationTitle("購入・使用情報")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("編集") { showingEdit = true }
@@ -65,6 +65,7 @@ struct ProductUnitForm: View {
     @Environment(\.dismiss) private var dismiss
     let product: BeautyProduct
     let unit: ProductUnit?
+    let isAdditional: Bool
 
     @State private var status: ProductUnitStatus
     @State private var hasPurchasedAt: Bool
@@ -80,10 +81,15 @@ struct ProductUnitForm: View {
     @State private var adjustedDaysText: String
     @State private var wantsReplacementNotification: Bool
     @State private var errorMessage: String?
+    @FocusState private var focusedField: Field?
 
-    init(product: BeautyProduct, unit: ProductUnit? = nil) {
+    private enum Field: Hashable { case price, purchasedFrom, manualDays, adjustedDays, note }
+
+
+    init(product: BeautyProduct, unit: ProductUnit? = nil, isAdditional: Bool = false) {
         self.product = product
         self.unit = unit
+        self.isAdditional = isAdditional
         _status = State(initialValue: unit?.status ?? .unopened)
         _hasPurchasedAt = State(initialValue: unit?.purchasedAt != nil)
         _purchasedAt = State(initialValue: unit?.purchasedAt ?? .now)
@@ -134,9 +140,29 @@ struct ProductUnitForm: View {
                 || Calendar.current.startOfDay(for: finishedAt) >= Calendar.current.startOfDay(for: openedAt))
     }
 
+    private var draftSnapshot: FormDraftSnapshot {
+        FormDraftSnapshot(
+            text: [status.rawValue, priceText, purchasedFrom, note, manualDaysText, adjustedDaysText],
+            dates: [purchasedAt, openedAt, finishedAt],
+            flags: [hasPurchasedAt, hasOpenedAt, usesReplacementEstimate, wantsReplacementNotification]
+        )
+    }
+
+    private var validationMessage: String? {
+        if !hasValidPrice { return "価格を0以上の整数に直すと保存できます。" }
+        if usesReplacementEstimate && manualUsageDays.map({ (1...3650).contains($0) }) != true {
+            return "目安を表示するには初回の使用日数（必須）を1〜3650日で入力してください。"
+        }
+        if !hasValidUsageDays { return "調整する日数を1〜3650日に直すと保存できます。" }
+        if status == .inUse && !hasOpenedAt { return "使用中の商品は開封日（必須）を記録してください。" }
+        if !isValid { return "使い切り日を開封日以降にすると保存できます。" }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                FormValidationHint(message: validationMessage)
                 Section("使用状況") {
                     Picker("状態", selection: $status) {
                         ForEach(ProductUnitStatus.allCases) { status in
@@ -148,7 +174,7 @@ struct ProductUnitForm: View {
                         DatePicker("購入日", selection: $purchasedAt, displayedComponents: .date)
                     }
                     if status != .unopened {
-                        Toggle("開封日を記録", isOn: $hasOpenedAt)
+                        Toggle(status == .inUse ? "開封日を記録（必須）" : "開封日を記録", isOn: $hasOpenedAt)
                         if hasOpenedAt {
                             DatePicker("開封日", selection: $openedAt, displayedComponents: .date)
                         }
@@ -170,6 +196,7 @@ struct ProductUnitForm: View {
                 }
                 Section("購入情報（任意）") {
                     TextField("価格（円）", text: $priceText)
+                        .formField($focusedField, equals: .price)
                         .keyboardType(.numberPad)
                     if !hasValidPrice {
                         Text("0以上の整数を入力してください。")
@@ -177,13 +204,16 @@ struct ProductUnitForm: View {
                             .foregroundStyle(.red)
                     }
                     TextField("購入元", text: $purchasedFrom)
+                        .formField($focusedField, equals: .purchasedFrom)
                 }
                 Section("買い替え目安") {
                     Toggle("目安を表示", isOn: $usesReplacementEstimate)
                     if usesReplacementEstimate {
-                        TextField("初回・履歴なしの使用日数", text: $manualDaysText)
+                        TextField("初回・履歴なしの使用日数（必須）", text: $manualDaysText)
+                            .formField($focusedField, equals: .manualDays)
                             .keyboardType(.numberPad)
                         TextField("調整する日数（任意）", text: $adjustedDaysText)
+                            .formField($focusedField, equals: .adjustedDays)
                             .keyboardType(.numberPad)
                         if !hasValidUsageDays {
                             Text("使用日数は1〜3650日の整数で入力してください。")
@@ -195,7 +225,7 @@ struct ProductUnitForm: View {
                             .foregroundStyle(.secondary)
                         if status == .unopened || status == .inUse {
                             Toggle("この1本の通知を受け取る", isOn: $wantsReplacementNotification)
-                            Text("端末全体の通知は設定タブで変更できます。")
+                            Text("端末全体の通知は設定画面で変更できます。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -203,14 +233,14 @@ struct ProductUnitForm: View {
                 }
                 Section("メモ（任意）") {
                     TextField("この1本についてのメモ", text: $note, axis: .vertical)
+                        .formField($focusedField, equals: .note, last: true)
                 }
             }
-            .navigationTitle(unit == nil ? "1本を登録" : "1本を編集")
+            .navigationTitle(unit == nil ? (isAdditional ? "同じ商品を追加" : "購入・使用情報を登録") : "購入・使用情報を編集")
             .navigationBarTitleDisplayMode(.inline)
+            .guardUnsavedDraft(draftSnapshot)
+            .formKeyboard($focusedField, fields: [.price, .purchasedFrom] + (usesReplacementEstimate ? [.manualDays, .adjustedDays] : []) + [.note])
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { save() }.disabled(!isValid)
                 }

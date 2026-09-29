@@ -588,7 +588,7 @@ private struct HomeView: View {
                 )
             }
             .sheet(item: $registeringProduct) { product in
-                ProductUnitForm(product: product)
+                ProductUnitForm(product: product, isAdditional: productUnits.contains { $0.productID == product.id })
             }
             .alert(homeAlert?.title ?? "", isPresented: Binding(
                 get: { homeAlert != nil },
@@ -914,20 +914,20 @@ private struct HomeView: View {
 
     private func dateSummary(for action: HomeAction) -> String {
         let dateText = action.date.formatted(
-            .dateTime.month().day().locale(Locale(identifier: "ja_JP"))
+            .dateTime.month().day().locale(JapanesePresentation.locale)
         )
         switch action.kind {
         case .salonNeedsBooking:
             let label = action.hasDueDateOverride ? "今回の目安" : "次回目安"
             if remindersEnabled, let reminderDate = action.snoozedReminderDate {
                 let reminderText = reminderDate.formatted(
-                    .dateTime.month().day().locale(Locale(identifier: "ja_JP"))
+                    .dateTime.month().day().locale(JapanesePresentation.locale)
                 )
                 return "\(label) \(dateText) · \(reminderText)に再通知"
             }
             return "\(label) \(dateText)"
         case .salonBooked:
-            return "予約済み · \(action.date.formatted(.dateTime.month().day().hour().minute()))"
+            return "予約済み · \(action.date.formatted(.dateTime.month().day().hour().minute().locale(JapanesePresentation.locale)))"
         case .salonNeedsRecord: return "予約日時を経過 · \(dateText)"
         case .itemReplacement: return "買い替え目安 \(dateText)"
         }
@@ -1072,10 +1072,8 @@ private struct HomeView: View {
             }
             .navigationTitle("次回目安を変更")
             .navigationBarTitleDisplayMode(.inline)
+            .guardUnsavedDraft(FormDraftSnapshot(dates: [editedDueDate]))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { editingDueAction = nil }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
                         updateAdjustment(for: action) { adjustment in
