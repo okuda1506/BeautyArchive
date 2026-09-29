@@ -23,9 +23,10 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
         context: ModelContext,
         remindersEnabled: Bool,
         leadChoice: Int,
-        customLeadDays: Int
+        customLeadDays: Int,
+        notificationTimeMinutes: Int
     ) throws {
-        schemaVersion = 4
+        schemaVersion = 5
         exportedAt = .now
         salonVisits = try context.fetch(FetchDescriptor<SalonVisit>()).map(SalonVisitEntry.init)
         salonTreatments = try context.fetch(FetchDescriptor<SalonTreatment>()).map(SalonTreatmentEntry.init)
@@ -52,7 +53,8 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
         reminderSettings = ReminderSettingsEntry(
             enabledOnThisDevice: remindersEnabled,
             leadChoice: leadChoice,
-            customLeadDays: customLeadDays
+            customLeadDays: customLeadDays,
+            notificationTimeMinutes: notificationTimeMinutes
         )
     }
 
@@ -327,6 +329,7 @@ nonisolated struct BeautyArchiveExport: Encodable, Sendable {
         let enabledOnThisDevice: Bool
         let leadChoice: Int
         let customLeadDays: Int
+        let notificationTimeMinutes: Int
     }
 
     struct SalonReminderAdjustmentEntry: Encodable, Sendable {

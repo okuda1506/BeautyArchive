@@ -144,8 +144,12 @@ final class ReminderNotificationCoordinator {
                 choice: defaults.integer(forKey: ReminderPreferences.leadChoiceKey),
                 customDays: defaults.integer(forKey: ReminderPreferences.customLeadDaysKey)
             )
+            let notificationTimeMinutes = ReminderPreferences.notificationTimeMinutes(defaults: defaults)
             let plans = targets.compactMap {
-                $0.plan(snoozes: snoozes, leadDays: leadDays, now: now, calendar: calendar)
+                $0.plan(
+                    snoozes: snoozes, leadDays: leadDays, now: now, calendar: calendar,
+                    notificationTimeMinutes: notificationTimeMinutes
+                )
             }.sorted { $0.fireDate < $1.fireDate }
             return await scheduler.reconcile(targets: targets, plans: plans,
                                              enabled: enabled, calendar: calendar)
@@ -166,7 +170,10 @@ final class ReminderNotificationCoordinator {
             }
             return
         }
-        guard let date = action.fireDate(now: now, calendar: calendar), date > now
+        let notificationTimeMinutes = ReminderPreferences.notificationTimeMinutes(defaults: defaults)
+        guard let date = action.fireDate(
+            now: now, calendar: calendar, notificationTimeMinutes: notificationTimeMinutes
+        ), date > now
         else { throw ActionError.invalidDate }
         let previous = snoozes.record(for: target.identifier)
         snoozes.set(.init(revision: target.revision, fireDate: date), for: target.identifier)

@@ -63,13 +63,20 @@ struct SettingsView: View {
                             set: { reminderTiming.setCustomLeadDays($0) }
                         ), in: 0...365)
                     }
-                    Text("通知は選んだ日の午前9時に届きます。")
+                    NavigationLink {
+                        ReminderTimePickerView(initialMinutes: reminderTiming.notificationTimeMinutes) {
+                            reminderTiming.setNotificationTimeMinutes($0)
+                        }
+                    } label: {
+                        LabeledContent("通知時刻", value: ReminderTimePresentation.label(for: reminderTiming.notificationTimeMinutes))
+                    }
+                    Text("通知は選んだ日の設定時刻に届きます。通知から延期した場合も同じ時刻に届きます。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text("通知の「明日また通知」「1週間後に通知」で再通知を延期できます。Apple Watchに転送された通知からも操作できます。延期はこのiPhoneの通知だけに反映され、目安日は変わりません。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("iCloudを利用できる場合、通知タイミングは同じApple Accountの端末へ引き継がれます。反映には時間がかかる場合があります。通知の許可とオン・オフは端末ごとです。")
+                    Text("iCloudを利用できる場合、通知タイミングと時刻は同じApple Accountの端末へ引き継がれます。反映には時間がかかる場合があります。通知の許可とオン・オフは端末ごとです。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(authorizationDescription)
@@ -184,7 +191,8 @@ struct SettingsView: View {
                 context: modelContext,
                 remindersEnabled: remindersEnabled,
                 leadChoice: reminderTiming.leadChoice,
-                customLeadDays: reminderTiming.customLeadDays
+                customLeadDays: reminderTiming.customLeadDays,
+                notificationTimeMinutes: reminderTiming.notificationTimeMinutes
             )
             exportedURL = try await export.writeFile()
         } catch {
@@ -297,6 +305,53 @@ struct SettingsView: View {
             remindersEnabled = true
         } else {
             remindersEnabled = false
+        }
+    }
+}
+
+private enum ReminderTimePresentation {
+    static func date(for minutes: Int) -> Date {
+        Calendar.current.date(
+            bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: .now
+        ) ?? .now
+    }
+
+    static func label(for minutes: Int) -> String {
+        date(for: minutes).japaneseFormatted(date: .omitted, time: .shortened)
+    }
+}
+
+private struct ReminderTimePickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    let onSave: (Int) -> Void
+    @State private var selectedTime: Date
+
+    init(initialMinutes: Int, onSave: @escaping (Int) -> Void) {
+        self.onSave = onSave
+        _selectedTime = State(initialValue: ReminderTimePresentation.date(for: initialMinutes))
+    }
+
+    var body: some View {
+        Form {
+            DatePicker("通知時刻", selection: $selectedTime, displayedComponents: .hourAndMinute)
+            Text("このiPhoneの現地時刻で通知します。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .navigationTitle("通知時刻")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("キャンセル") { dismiss() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("保存") {
+                    let components = Calendar.current.dateComponents([.hour, .minute], from: selectedTime)
+                    guard let hour = components.hour, let minute = components.minute else { return }
+                    onSave(hour * 60 + minute)
+                    dismiss()
+                }
+            }
         }
     }
 }

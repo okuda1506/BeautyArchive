@@ -16,14 +16,19 @@ enum LocalNotificationReconciler {
     static func fireDate(
         for dueDate: Date,
         leadDays: Int,
+        notificationTimeMinutes: Int = ReminderPreferences.defaultNotificationTimeMinutes,
         now: Date,
         calendar: Calendar
     ) -> Date? {
-        guard let reminderDay = calendar.date(
+        guard (0..<24 * 60).contains(notificationTimeMinutes),
+              let reminderDay = calendar.date(
             byAdding: .day, value: -max(0, leadDays),
             to: calendar.startOfDay(for: dueDate)
         ), let fireDate = calendar.date(
-            bySettingHour: 9, minute: 0, second: 0, of: reminderDay
+            bySettingHour: notificationTimeMinutes / 60,
+            minute: notificationTimeMinutes % 60,
+            second: 0,
+            of: reminderDay
         ), fireDate > now else { return nil }
         return fireDate
     }

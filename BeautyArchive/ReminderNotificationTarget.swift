@@ -11,11 +11,21 @@ nonisolated enum ReminderNotificationAction: String {
         }
     }
 
-    func fireDate(now: Date, calendar: Calendar) -> Date? {
+    func fireDate(
+        now: Date,
+        calendar: Calendar,
+        notificationTimeMinutes: Int = ReminderPreferences.defaultNotificationTimeMinutes
+    ) -> Date? {
         let days = self == .tomorrow ? 1 : 7
-        guard let day = calendar.date(byAdding: .day, value: days, to: calendar.startOfDay(for: now))
+        guard (0..<24 * 60).contains(notificationTimeMinutes),
+              let day = calendar.date(byAdding: .day, value: days, to: calendar.startOfDay(for: now))
         else { return nil }
-        return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: day)
+        return calendar.date(
+            bySettingHour: notificationTimeMinutes / 60,
+            minute: notificationTimeMinutes % 60,
+            second: 0,
+            of: day
+        )
     }
 }
 
@@ -59,17 +69,25 @@ struct ReminderNotificationTarget {
         snoozes: ReminderNotificationSnoozeStore,
         leadDays: Int,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        notificationTimeMinutes: Int = ReminderPreferences.defaultNotificationTimeMinutes
     ) -> LocalNotificationPlan? {
         let fireDate: Date
         if let snooze = snoozes.record(for: identifier), snooze.revision == revision {
             // Retain an expired snooze until this target changes. Changing lead time must
             // not resurrect the original notification after the postponed one has fired.
-            guard snooze.fireDate > now else { return nil }
-            fireDate = snooze.fireDate
+            guard snooze.fireDate > now,
+                  let adjustedSnoozeDate = calendar.date(
+                    bySettingHour: notificationTimeMinutes / 60,
+                    minute: notificationTimeMinutes % 60,
+                    second: 0,
+                    of: snooze.fireDate
+                  ), adjustedSnoozeDate > now else { return nil }
+            fireDate = adjustedSnoozeDate
         } else {
             guard let date = LocalNotificationReconciler.fireDate(
                 for: reminderDate, leadDays: usesLeadTime ? leadDays : 0,
+                notificationTimeMinutes: notificationTimeMinutes,
                 now: now, calendar: calendar
             ) else { return nil }
             fireDate = date
