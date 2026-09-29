@@ -109,6 +109,8 @@ The product image review also supports square cropping with drag and zoom contro
 
 The Home add menu opens salon records, products, salon appointments, and purchase plans.
 
+Cold launches show the app icon for 1.7 seconds, followed by a quick 0.32-second zoom and fade into the app. Background resumes skip this animation; Reduce Motion uses a short fade. First-time users see the existing introduction after the animation. See the [launch animation QA checklist (Japanese)](docs/LaunchAnimationManualQA.ja.md) for device checks, which have not yet been performed.
+
 Salon booking and product replacement notifications offer “Remind me tomorrow” and “Remind me in one week” actions (displayed in Japanese). These also work from notifications mirrored to Apple Watch, without a dedicated watchOS app. The paired iPhone schedules the reminder for 9:00 a.m. on the selected day. Notification snoozes stay on that iPhone and do not change maintenance dates or usage estimates. Watch delivery and background launch have not yet been verified on real devices; see the [Apple Watch notification QA checklist (Japanese)](docs/AppleWatchReminderManualQA.ja.md).
 
 Creating a salon visit from the previous record carries over the salon, stylist, booking URL, treatments, and their cycle lengths. The date, photos, and impressions remain specific to the new visit.
@@ -139,6 +141,8 @@ To check Google Calendar write requests without a simulator or Google account, r
 Run `bash scripts/check-google-account-binding.sh` to check that an account switch cannot return the new account's token to an in-flight calendar operation. This uses an in-memory credential store.
 
 Run `bash scripts/check-reminder-notification-actions.sh` to check snooze dates, persistence, invalid targets, failure recovery, and overlapping notification operations on macOS. It uses a mock notification scheduler and an in-memory SwiftData store, without booting a simulator or delivering notifications.
+
+Run `bash scripts/check-launch-presentation.sh` to check the launch presentation state across cold launches, background work, interrupted launches, and warm resumes without a simulator.
 
 Before a release, follow the [Google Calendar real-account QA checklist (Japanese)](docs/GoogleCalendarManualQA.ja.md). These live-account checks have not yet been performed.
 
