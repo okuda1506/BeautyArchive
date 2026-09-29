@@ -441,7 +441,7 @@ private struct MonthCalendarView: View {
             selectedDate = date
         } label: {
             VStack(spacing: 3) {
-                Text(date, format: .dateTime.day().locale(JapanesePresentation.locale))
+                Text(String(calendar.component(.day, from: date)))
                     .font(.subheadline)
                     .foregroundStyle(isSelected ? Color(uiColor: .systemBackground) : Color.primary)
                     .frame(width: 34, height: 34)
