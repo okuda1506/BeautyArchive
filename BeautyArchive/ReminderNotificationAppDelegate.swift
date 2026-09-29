@@ -4,6 +4,9 @@ import UserNotifications
 final class ReminderNotificationAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        if application.applicationState == .background {
+            LaunchPresentation.shared.finish()
+        }
         let center = UNUserNotificationCenter.current()
         // Install before launch finishes, including launches caused by a Watch action.
         // UIApplicationDelegateAdaptor retains this object; the center's delegate is weak.
@@ -22,6 +25,9 @@ final class ReminderNotificationAppDelegate: NSObject, UIApplicationDelegate, UN
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                            didReceive response: UNNotificationResponse) async {
         let request = response.notification.request
+        if ReminderNotificationAction(rawValue: response.actionIdentifier) != nil {
+            await LaunchPresentation.shared.finish()
+        }
         let input = ReminderNotificationResponse(
             actionIdentifier: response.actionIdentifier,
             requestIdentifier: request.identifier,

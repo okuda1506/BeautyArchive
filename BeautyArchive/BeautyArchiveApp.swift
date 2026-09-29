@@ -33,11 +33,13 @@ struct BeautyArchiveApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if hasStarted {
-                    ContentView()
-                } else {
-                    FirstLaunchView { hasStarted = true }
+            LaunchAnimationHost {
+                Group {
+                    if hasStarted {
+                        ContentView()
+                    } else {
+                        FirstLaunchView { hasStarted = true }
+                    }
                 }
             }
             .environment(reminderTiming)
