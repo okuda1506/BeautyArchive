@@ -89,7 +89,7 @@ struct ContentView: View {
         let adjustmentChanges = salonReminderAdjustments.map {
             "\($0.id.uuidString):\($0.updatedAt.timeIntervalSince1970):\($0.baseDueDate.timeIntervalSince1970):\($0.overrideDueDate?.timeIntervalSince1970 ?? 0):\($0.snoozedUntil?.timeIntervalSince1970 ?? 0)"
         }.sorted().joined(separator: "|")
-        return "\(remindersEnabled):\(reminderTiming.leadChoice):\(reminderTiming.customLeadDays):\(unitChanges):\(productChanges):\(visitChanges):\(treatmentChanges):\(appointmentChanges):\(appointmentTreatmentChanges):\(adjustmentChanges)"
+        return "\(remindersEnabled):\(reminderTiming.leadChoice):\(reminderTiming.customLeadDays):\(reminderTiming.notificationTimeMinutes):\(unitChanges):\(productChanges):\(visitChanges):\(treatmentChanges):\(appointmentChanges):\(appointmentTreatmentChanges):\(adjustmentChanges)"
     }
 
     var body: some View {

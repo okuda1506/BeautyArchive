@@ -14,6 +14,7 @@ extension NSUbiquitousKeyValueStore: ReminderTimingCloudStorage {}
 final class ReminderTimingSettings {
     private(set) var leadChoice: Int
     private(set) var customLeadDays: Int
+    private(set) var notificationTimeMinutes: Int
 
     @ObservationIgnored private var snapshot: ReminderTimingSnapshot
     @ObservationIgnored private let defaults: UserDefaults
@@ -48,11 +49,14 @@ final class ReminderTimingSettings {
                 leadChoice: [-1, 0, 1, 3, 7].contains(oldChoice ?? 0) ? oldChoice ?? 0 : 0,
                 customLeadDays: min(max(oldDays ?? 2, 0), 365),
                 revision: oldChoice != nil || oldDays != nil ? 1 : 0,
-                deviceID: deviceID
+                deviceID: deviceID,
+                notificationTimeMinutes: ReminderPreferences.notificationTimeMinutes(defaults: defaults)
             )
         }
         leadChoice = snapshot.leadChoice
         customLeadDays = snapshot.customLeadDays
+        notificationTimeMinutes = snapshot.notificationTimeMinutes
+            ?? ReminderPreferences.defaultNotificationTimeMinutes
         if syncEnabled {
             cloud.synchronize()
             refreshFromCloud()
@@ -62,13 +66,19 @@ final class ReminderTimingSettings {
     func setLeadChoice(_ choice: Int) {
         guard [-1, 0, 1, 3, 7].contains(choice), choice != leadChoice else { return }
         refreshFromCloud()
-        saveLocalChange(choice: choice, days: customLeadDays)
+        saveLocalChange(choice: choice, days: customLeadDays, notificationTimeMinutes: notificationTimeMinutes)
     }
 
     func setCustomLeadDays(_ days: Int) {
         guard (0...365).contains(days), days != customLeadDays else { return }
         refreshFromCloud()
-        saveLocalChange(choice: leadChoice, days: days)
+        saveLocalChange(choice: leadChoice, days: days, notificationTimeMinutes: notificationTimeMinutes)
+    }
+
+    func setNotificationTimeMinutes(_ minutes: Int) {
+        guard (0..<24 * 60).contains(minutes), minutes != notificationTimeMinutes else { return }
+        refreshFromCloud()
+        saveLocalChange(choice: leadChoice, days: customLeadDays, notificationTimeMinutes: minutes)
     }
 
     func refreshFromCloud() {
@@ -86,13 +96,15 @@ final class ReminderTimingSettings {
         }
     }
 
-    private func saveLocalChange(choice: Int, days: Int) {
-        guard choice != leadChoice || days != customLeadDays else { return }
+    private func saveLocalChange(choice: Int, days: Int, notificationTimeMinutes: Int) {
+        guard choice != leadChoice || days != customLeadDays
+                || notificationTimeMinutes != self.notificationTimeMinutes else { return }
         let next = ReminderTimingSnapshot(
             leadChoice: choice,
             customLeadDays: days,
             revision: snapshot.revision + 1,
-            deviceID: deviceID
+            deviceID: deviceID,
+            notificationTimeMinutes: notificationTimeMinutes
         )
         apply(next)
         if syncEnabled { publish(next) }
@@ -102,12 +114,15 @@ final class ReminderTimingSettings {
         snapshot = value
         leadChoice = value.leadChoice
         customLeadDays = value.customLeadDays
+        notificationTimeMinutes = value.notificationTimeMinutes
+            ?? ReminderPreferences.defaultNotificationTimeMinutes
         if let data = try? JSONEncoder().encode(value) {
             defaults.set(data, forKey: Self.localSnapshotKey)
         }
         // Keep the former local keys for existing installs and data exports.
         defaults.set(value.leadChoice, forKey: ReminderPreferences.leadChoiceKey)
         defaults.set(value.customLeadDays, forKey: ReminderPreferences.customLeadDaysKey)
+        defaults.set(notificationTimeMinutes, forKey: ReminderPreferences.notificationTimeKey)
     }
 
     private func publish(_ value: ReminderTimingSnapshot) {
