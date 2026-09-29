@@ -27,16 +27,20 @@ struct LaunchAnimationHost<Content: View>: View {
             }
         }
         .onAppear {
-            if UIApplication.shared.applicationState == .background || scenePhase == .background {
-                finishPresentation()
-            } else if scenePhase == .active {
+            if UIApplication.shared.applicationState == .active || scenePhase == .active {
                 startPresentation()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            startPresentation()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            finishForBackgroundTransition()
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active: startPresentation()
-            case .background: finishPresentation()
+            case .background: finishForBackgroundTransition()
             case .inactive:
                 // Startup can briefly become inactive. Only a real background
                 // transition should discard an animation already in progress.
@@ -87,6 +91,12 @@ struct LaunchAnimationHost<Content: View>: View {
                 }
             }
         }
+    }
+
+    private func finishForBackgroundTransition() {
+        guard presentation.finishOnBackgroundTransition() else { return }
+        animationTask?.cancel()
+        animationTask = nil
     }
 
     private func finishPresentation() {

@@ -41,6 +41,16 @@ struct LaunchPresentationContract {
         let nextProcess = LaunchPresentation()
         expect(nextProcess.beginForegroundPresentation(), "A new process must receive its own launch animation")
 
+        let initialBackgroundState = LaunchPresentation()
+        expect(!initialBackgroundState.finishOnBackgroundTransition() && initialBackgroundState.isVisible,
+               "An initial background state before activation must not consume a normal cold launch")
+        expect(initialBackgroundState.beginForegroundPresentation(),
+               "Activation after an initial background state must still start the animation")
+        expect(initialBackgroundState.finishOnBackgroundTransition() && !initialBackgroundState.isVisible,
+               "A real background transition after activation must finish the animation")
+        expect(!initialBackgroundState.beginForegroundPresentation(),
+               "A warm resume after a real background transition must not replay the animation")
+
         // A synchronous render callback must not remove the overlay before
         // the transition duration, even when SwiftUI registers no animation.
         let playback = LaunchPresentation()

@@ -19,6 +19,10 @@ iOS標準のLaunch Screenにも同じ96ptのアイコンとLight/Dark用の背�
 
 `bash scripts/check-launch-presentation.sh`では、終了状態からの起動・通常の復帰・バックグラウンド起動・途中離脱・新しいプロセスの状態管理をmacOS上で検証します。静止・拡大の途中で表示が消えないこと、キャンセル、Reduce Motionの短いフェードも、制御可能な待機処理を使って確認します。シミュレータは起動しません。
 
-実機・シミュレータでのモーション、標準画面との切り替わり、VoiceOver、Watch通知のバックグラウンド起動は未検証です。
+2026-09-29に、起動済みのiPhone 17 / iOS 26.5シミュレータ1台で通常起動を録画し、アイコンの静止表示から拡大・フェードしてホームへ切り替わる描画を確認しました。Reduce Motionはオフです。同じアプリプロセスをバックグラウンドから戻した時は、アイコン表示と待ち時間を入れずホームへ戻ることも録画で確認しました。
+
+通常起動の`didFinishLaunchingWithOptions`でも`applicationState`が`.background`になることを診断ログで確認しました。その値では演出を消費せず、アクティブ化を待って開始します。開始前のSceneのbackground状態も無視し、再生開始後の実際のbackground移行とWatch通知アクションで演出を終了します。
+
+実機での描画、Light/Dark両方・全画面サイズ、標準画面のキャッシュとの切り替わり、初回利用の案内、Reduce Motion有効時の描画、VoiceOver、Watch通知のバックグラウンド起動は未検証です。Unit Test・UI TestはCPU負荷を避けるため実行していません。
 
 アイコンを変更した場合は、`swift scripts/export-launch-icon.swift BeautyArchive/Assets.xcassets/AppIcon.appiconset/AppIcon.png BeautyArchive/Assets.xcassets/LaunchIcon.imageset/LaunchIcon.pdf`で起動用の画像も更新できます。既存の画像を96ptの角丸PDFとして配置し、標準画面とSwiftUIの両方で使用します。

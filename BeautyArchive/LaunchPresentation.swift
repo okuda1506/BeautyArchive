@@ -60,4 +60,14 @@ final class LaunchPresentation {
     func finish() {
         phase = .finished
     }
+
+    /// A not-yet-active scene can initially report background even on a normal
+    /// launch. Only consume a background transition after foreground playback
+    /// has started. Watch notification actions explicitly call finish().
+    @discardableResult
+    func finishOnBackgroundTransition() -> Bool {
+        guard phase != .waiting else { return false }
+        finish()
+        return true
+    }
 }
