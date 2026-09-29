@@ -4,9 +4,8 @@ import UserNotifications
 final class ReminderNotificationAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        if application.applicationState == .background {
-            LaunchPresentation.shared.finish()
-        }
+        // Normal foreground launches can still report .background here.
+        // Consume background notification launches when their action arrives.
         let center = UNUserNotificationCenter.current()
         // Install before launch finishes, including launches caused by a Watch action.
         // UIApplicationDelegateAdaptor retains this object; the center's delegate is weak.
