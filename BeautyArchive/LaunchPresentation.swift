@@ -34,6 +34,29 @@ final class LaunchPresentation {
         phase = .expanding
     }
 
+    /// Keep the overlay alive for the entire transition. A SwiftUI completion
+    /// can run immediately when its transaction has no registered animations.
+    func playForegroundPresentation(
+        reduceMotion: Bool,
+        wait: (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        animateExpansion: () -> Void
+    ) async {
+        guard phase == .holding else { return }
+        do {
+            try await wait(Self.holdDuration)
+            guard !Task.isCancelled, phase == .holding else { return }
+            expand()
+            animateExpansion()
+
+            let duration = reduceMotion ? Self.fadeDuration : Self.expansionDuration
+            try await wait(.seconds(duration))
+            guard !Task.isCancelled, phase == .expanding else { return }
+            finish()
+        } catch {
+            finish()
+        }
+    }
+
     func finish() {
         phase = .finished
     }

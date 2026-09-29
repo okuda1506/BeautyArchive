@@ -3,7 +3,7 @@ import Foundation
 @main
 struct LaunchPresentationContract {
     @MainActor
-    static func main() {
+    static func main() async {
         var checks = 0
         func expect(_ value: @autoclosure () -> Bool, _ message: String) {
             checks += 1
@@ -40,6 +40,64 @@ struct LaunchPresentationContract {
 
         let nextProcess = LaunchPresentation()
         expect(nextProcess.beginForegroundPresentation(), "A new process must receive its own launch animation")
+
+        // A synchronous render callback must not remove the overlay before
+        // the transition duration, even when SwiftUI registers no animation.
+        let playback = LaunchPresentation()
+        playback.beginForegroundPresentation()
+        var waits = 0
+        var renderCalls = 0
+        await playback.playForegroundPresentation(reduceMotion: false, wait: { duration in
+            waits += 1
+            if waits == 1 {
+                expect(duration == .milliseconds(1_700), "The icon must hold for 1.7 seconds")
+                expect(playback.phase == .holding && playback.isVisible, "The icon must remain visible throughout the hold")
+            } else {
+                expect(duration == .milliseconds(320), "The overlay must allow the complete 0.32-second expansion")
+                expect(playback.phase == .expanding && playback.isVisible && renderCalls == 1,
+                       "A synchronous render callback must leave the overlay visible while expanding")
+            }
+        }, animateExpansion: { renderCalls += 1 })
+        expect(waits == 2 && !playback.isVisible, "Only the elapsed transition may finish the presentation")
+
+        let reducedMotion = LaunchPresentation()
+        reducedMotion.beginForegroundPresentation()
+        var reducedWaits: [Duration] = []
+        await reducedMotion.playForegroundPresentation(reduceMotion: true, wait: { duration in
+            reducedWaits.append(duration)
+            expect(reducedMotion.isVisible, "Reduce Motion must retain the overlay until its fade finishes")
+        }, animateExpansion: {})
+        expect(reducedWaits == [.milliseconds(1_700), .milliseconds(180)],
+               "Reduce Motion must retain the hold and use the short fade duration")
+        expect(!reducedMotion.isVisible, "The short fade must reveal the app")
+
+        let holdInterruption = LaunchPresentation()
+        holdInterruption.beginForegroundPresentation()
+        var interruptedRenderCalls = 0
+        await holdInterruption.playForegroundPresentation(reduceMotion: false, wait: { _ in
+            holdInterruption.finish()
+        }, animateExpansion: { interruptedRenderCalls += 1 })
+        expect(interruptedRenderCalls == 0 && !holdInterruption.isVisible,
+               "Leaving during the hold must skip all expansion callbacks")
+
+        let expansionInterruption = LaunchPresentation()
+        expansionInterruption.beginForegroundPresentation()
+        var interruptedWaits = 0
+        await expansionInterruption.playForegroundPresentation(reduceMotion: false, wait: { _ in
+            interruptedWaits += 1
+            if interruptedWaits == 2 { expansionInterruption.finish() }
+        }, animateExpansion: {})
+        expect(!expansionInterruption.isVisible && !expansionInterruption.beginForegroundPresentation(),
+               "Leaving during expansion must never restore the overlay on resume")
+
+        let cancelledPlayback = LaunchPresentation()
+        cancelledPlayback.beginForegroundPresentation()
+        var cancelledRenderCalls = 0
+        await cancelledPlayback.playForegroundPresentation(reduceMotion: false, wait: { _ in
+            throw CancellationError()
+        }, animateExpansion: { cancelledRenderCalls += 1 })
+        expect(cancelledRenderCalls == 0 && !cancelledPlayback.isVisible,
+               "Cancelling the timer must immediately reveal the app without expanding")
         print("Launch presentation contract passed (\(checks) checks)")
     }
 }
