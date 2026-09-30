@@ -21,7 +21,7 @@ B/ONE is not intended to replace salon booking services or online stores. It is 
 ## Motion Graphic
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/okuda1506/BeautyArchive/main/docs/media/BONE-motion-v6.mp4">
+  <a href="https://github.com/user-attachments/assets/dccba9f0-4b47-46b4-a75d-292754d3907d">
     <img src="docs/media/BONE-motion-v6-poster.jpg" alt="Watch B/ONE's 15-second motion graphic" width="320" />
   </a>
 </p>
