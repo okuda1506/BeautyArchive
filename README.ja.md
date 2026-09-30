@@ -23,7 +23,7 @@ B/ONE自体が美容院予約サービスやECサイトを置き換えるので�
 ## モーショングラフィック
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/okuda1506/BeautyArchive/main/docs/media/BONE-motion-v6.mp4">
+  <a href="https://github.com/user-attachments/assets/dccba9f0-4b47-46b4-a75d-292754d3907d">
     <img src="docs/media/BONE-motion-v6-poster.jpg" alt="B/ONEの15秒モーショングラフィックを再生" width="320" />
   </a>
 </p>
