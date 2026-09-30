@@ -18,6 +18,16 @@ B/ONE is not intended to replace salon booking services or online stores. It is 
 
 > **Beauty, all in one.**
 
+## Motion Graphic
+
+<p align="center">
+  <a href="https://raw.githubusercontent.com/okuda1506/BeautyArchive/main/docs/media/BONE-motion-v6.mp4">
+    <img src="docs/media/BONE-motion-v6-poster.jpg" alt="Watch B/ONE's 15-second motion graphic" width="320" />
+  </a>
+</p>
+
+Watch the latest 15-second version with its original soundtrack. The video uses a recreated app interface and sample data; it is not a recording from a physical iPhone.
+
 ## Background
 
 Beauty-related activities are spread across more services and places than one might expect.

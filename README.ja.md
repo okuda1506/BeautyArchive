@@ -20,6 +20,16 @@ B/ONE自体が美容院予約サービスやECサイトを置き換えるので�
 
 > **Beautyを、ひとつに。**
 
+## モーショングラフィック
+
+<p align="center">
+  <a href="https://raw.githubusercontent.com/okuda1506/BeautyArchive/main/docs/media/BONE-motion-v6.mp4">
+    <img src="docs/media/BONE-motion-v6-poster.jpg" alt="B/ONEの15秒モーショングラフィックを再生" width="320" />
+  </a>
+</p>
+
+最新の15秒版（オリジナル音源入り）です。アプリ画面を再構成し、サンプルデータで制作しています。実機の録画ではありません。
+
 ## 開発背景
 
 美容に関する行動は、想像以上にさまざまなサービスや場所に分散している。
