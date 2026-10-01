@@ -30,7 +30,7 @@ B/ONE自体が美容院予約サービスやECサイトを置き換えるので�
       </a>
     </td>
     <td align="center" valign="top" width="50%">
-      <img src="docs/media/BONE-screen-previews.jpg" alt="B/ONEのホーム・記録・予定・アイテム・追加メニュー・通知設定の画面プレビュー" height="570" />
+      <img src="docs/media/BONE-screen-previews.jpg" alt="B/ONEのホーム・記録・予定・アイテム・追加メニュー・通知設定の画面プレビュー" height="600" />
     </td>
   </tr>
 </table>
