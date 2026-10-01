@@ -33,7 +33,7 @@ B/ONE is not intended to replace salon booking services or online stores. It is 
   </tr>
 </table>
 
-Watch the latest 15-second version with its original soundtrack. The video uses a recreated app interface and sample data; it is not a recording from a physical iPhone. The screen previews use actual simulator captures with captions added around the screens.
+Watch the latest 15-second version with its original soundtrack. The video uses a recreated app interface and sample data; it is not a recording from a physical iPhone.
 
 ## Background
 
