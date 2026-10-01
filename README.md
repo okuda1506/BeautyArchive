@@ -22,13 +22,13 @@ B/ONE is not intended to replace salon booking services or online stores. It is 
 
 <table>
   <tr>
-    <td align="center" valign="top" width="50%">
+    <td align="center" valign="top" width="45%">
       <a href="https://github.com/user-attachments/assets/dccba9f0-4b47-46b4-a75d-292754d3907d">
         <img src="docs/media/BONE-motion-v6-poster.jpg" alt="Watch B/ONE's 15-second motion graphic" width="320" />
       </a>
     </td>
-    <td align="center" valign="top" width="50%">
-      <img src="docs/media/BONE-screen-previews.jpg" alt="Six B/ONE app screen previews: Home, Archive, Calendar, Items, Quick Add, and Reminder Settings" height="600" />
+    <td align="center" valign="top" width="55%">
+      <img src="docs/media/BONE-screen-previews.jpg" alt="Six B/ONE app screen previews: Home, Archive, Calendar, Items, Quick Add, and Reminder Settings" height="569" />
     </td>
   </tr>
 </table>

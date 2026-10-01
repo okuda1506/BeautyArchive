@@ -24,13 +24,13 @@ B/ONE自体が美容院予約サービスやECサイトを置き換えるので�
 
 <table>
   <tr>
-    <td align="center" valign="top" width="50%">
+    <td align="center" valign="top" width="45%">
       <a href="https://github.com/user-attachments/assets/dccba9f0-4b47-46b4-a75d-292754d3907d">
         <img src="docs/media/BONE-motion-v6-poster.jpg" alt="B/ONEの15秒モーショングラフィックを再生" width="320" />
       </a>
     </td>
-    <td align="center" valign="top" width="50%">
-      <img src="docs/media/BONE-screen-previews.jpg" alt="B/ONEのホーム・記録・予定・アイテム・追加メニュー・通知設定の画面プレビュー" height="600" />
+    <td align="center" valign="top" width="55%">
+      <img src="docs/media/BONE-screen-previews.jpg" alt="B/ONEのホーム・記録・予定・アイテム・追加メニュー・通知設定の画面プレビュー" height="569" />
     </td>
   </tr>
 </table>
