@@ -20,15 +20,22 @@ B/ONE自体が美容院予約サービスやECサイトを置き換えるので�
 
 > **Beautyを、ひとつに。**
 
-## モーショングラフィック
+## 画面プレビュー
 
-<p align="center">
-  <a href="https://github.com/user-attachments/assets/dccba9f0-4b47-46b4-a75d-292754d3907d">
-    <img src="docs/media/BONE-motion-v6-poster.jpg" alt="B/ONEの15秒モーショングラフィックを再生" width="320" />
-  </a>
-</p>
+<table>
+  <tr>
+    <td align="center" valign="top" width="35%">
+      <a href="https://github.com/user-attachments/assets/dccba9f0-4b47-46b4-a75d-292754d3907d">
+        <img src="docs/media/BONE-motion-v6-poster.jpg" alt="B/ONEの15秒モーショングラフィックを再生" width="320" />
+      </a>
+    </td>
+    <td align="center" valign="top" width="65%">
+      <img src="docs/media/BONE-screen-previews.jpg" alt="B/ONEのホーム・記録・予定・アイテム・追加メニュー・通知設定の画面プレビュー" width="680" />
+    </td>
+  </tr>
+</table>
 
-最新の15秒版（オリジナル音源入り）です。アプリ画面を再構成し、サンプルデータで制作しています。実機の録画ではありません。
+最新の15秒版（オリジナル音源入り）です。動画はアプリ画面を再構成し、サンプルデータで制作しています。実機の録画ではありません。画面プレビューはシミュレータで撮影した実際のアプリ画面を使用し、画面外に見出しを加えています。
 
 ## 開発背景
 

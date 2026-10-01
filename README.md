@@ -18,15 +18,22 @@ B/ONE is not intended to replace salon booking services or online stores. It is 
 
 > **Beauty, all in one.**
 
-## Motion Graphic
+## Screen Previews
 
-<p align="center">
-  <a href="https://github.com/user-attachments/assets/dccba9f0-4b47-46b4-a75d-292754d3907d">
-    <img src="docs/media/BONE-motion-v6-poster.jpg" alt="Watch B/ONE's 15-second motion graphic" width="320" />
-  </a>
-</p>
+<table>
+  <tr>
+    <td align="center" valign="top" width="35%">
+      <a href="https://github.com/user-attachments/assets/dccba9f0-4b47-46b4-a75d-292754d3907d">
+        <img src="docs/media/BONE-motion-v6-poster.jpg" alt="Watch B/ONE's 15-second motion graphic" width="320" />
+      </a>
+    </td>
+    <td align="center" valign="top" width="65%">
+      <img src="docs/media/BONE-screen-previews.jpg" alt="Six B/ONE app screen previews: Home, Archive, Calendar, Items, Quick Add, and Reminder Settings" width="680" />
+    </td>
+  </tr>
+</table>
 
-Watch the latest 15-second version with its original soundtrack. The video uses a recreated app interface and sample data; it is not a recording from a physical iPhone.
+Watch the latest 15-second version with its original soundtrack. The video uses a recreated app interface and sample data; it is not a recording from a physical iPhone. The screen previews use actual simulator captures with captions added around the screens.
 
 ## Background
 
