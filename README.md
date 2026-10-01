@@ -28,7 +28,7 @@ B/ONE is not intended to replace salon booking services or online stores. It is 
       </a>
     </td>
     <td align="center" valign="top" width="50%">
-      <img src="docs/media/BONE-screen-previews.jpg" alt="Six B/ONE app screen previews: Home, Archive, Calendar, Items, Quick Add, and Reminder Settings" height="570" />
+      <img src="docs/media/BONE-screen-previews.jpg" alt="Six B/ONE app screen previews: Home, Archive, Calendar, Items, Quick Add, and Reminder Settings" height="600" />
     </td>
   </tr>
 </table>
