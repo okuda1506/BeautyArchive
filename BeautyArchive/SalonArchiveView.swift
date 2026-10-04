@@ -14,10 +14,15 @@ struct SalonArchiveView: View {
     @State private var pendingDeletion: PendingDeletion?
     @State private var path: [UUID] = []
 
+    private var unrecordedAppointments: [BeautyAppointment] {
+        appointments.filter { !$0.isCancelled && !$0.isCompleted }
+            .sorted { $0.startAt < $1.startAt }
+    }
+
     var body: some View {
         NavigationStack(path: $path) {
             Group {
-                if visits.isEmpty {
+                if visits.isEmpty && unrecordedAppointments.isEmpty {
                     ContentUnavailableView(
                         "美容院の記録はまだありません",
                         systemImage: "scissors",
@@ -25,44 +30,81 @@ struct SalonArchiveView: View {
                     )
                 } else {
                     List {
-                        ForEach(visits) { visit in
-                            NavigationLink(value: visit.id) {
-                                HStack(spacing: 12) {
-                                    if let data = firstPhoto(for: visit)?.imageData,
-                                       let image = UIImage(data: data) {
-                                        Image(uiImage: image)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 60, height: 60)
-                                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                                            .accessibilityHidden(true)
-                                    } else {
-                                        Image(systemName: "scissors")
-                                            .font(.title3)
-                                            .foregroundStyle(.secondary)
-                                            .frame(width: 60, height: 60)
-                                            .background(Color(uiColor: .tertiarySystemGroupedBackground))
-                                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                                            .accessibilityHidden(true)
-                                    }
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text(visit.date, format: .dateTime.year().month().day().locale(JapanesePresentation.locale))
-                                            .font(BOneTypography.rowTitle)
-                                        Text(treatmentNames(for: visit))
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                        if !visit.salonName.isEmpty {
-                                            Text(visit.salonName)
+                        if !unrecordedAppointments.isEmpty {
+                            Section {
+                                ForEach(unrecordedAppointments) { appointment in
+                                    NavigationLink {
+                                        AppointmentDetail(appointment: appointment, onSave: { _ in })
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 5) {
+                                            Text(appointment.title)
+                                                .font(BOneTypography.rowTitle)
+                                            Text(appointment.startAt.japaneseFormatted(date: .abbreviated, time: .shortened))
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                            if !appointment.shopName.isEmpty {
+                                                Text(appointment.shopName)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            Text(appointment.startAt < .now ? "来店の記録待ち" : "予約済み")
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
                                         }
+                                        .padding(.vertical, 4)
                                     }
                                 }
-                                .padding(.vertical, 4)
+                            } header: {
+                                Text("美容院の予定")
+                            } footer: {
+                                Text("来店後に予定の詳細から記録を残すと、来店履歴に表示されます。")
                             }
                         }
-                        .onDelete(perform: delete)
+                        Section("来店履歴") {
+                            if visits.isEmpty {
+                                Text("来店の記録はまだありません")
+                                    .foregroundStyle(.secondary)
+                            }
+                            ForEach(visits) { visit in
+                                NavigationLink(value: visit.id) {
+                                    HStack(spacing: 12) {
+                                        if let data = firstPhoto(for: visit)?.imageData,
+                                           let image = UIImage(data: data) {
+                                            Image(uiImage: image)
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: 60, height: 60)
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                                .accessibilityHidden(true)
+                                        } else {
+                                            Image(systemName: "scissors")
+                                                .font(.title3)
+                                                .foregroundStyle(.secondary)
+                                                .frame(width: 60, height: 60)
+                                                .background(Color(uiColor: .tertiarySystemGroupedBackground))
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                                .accessibilityHidden(true)
+                                        }
+                                        VStack(alignment: .leading, spacing: 5) {
+                                            Text(visit.date, format: .dateTime.year().month().day().locale(JapanesePresentation.locale))
+                                                .font(BOneTypography.rowTitle)
+                                            Text(treatmentNames(for: visit))
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                            if !visit.salonName.isEmpty {
+                                                Text(visit.salonName)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                            .onDelete(perform: delete)
+                        }
                     }
+                    .contentMargins(.bottom, BottomNavigationLayout.scrollContentClearance, for: .scrollContent)
                 }
             }
             .navigationTitle("記録")
