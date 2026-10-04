@@ -52,6 +52,7 @@ struct FirstLaunchView: View {
             Button(action: onStart) {
                 Text("はじめる")
                     .font(.headline)
+                    .foregroundStyle(Color(uiColor: .systemBackground))
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 52)
             }
