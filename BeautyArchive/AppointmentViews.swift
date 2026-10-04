@@ -136,7 +136,7 @@ struct AppointmentListView: View {
                 }
             }
             .contentMargins(.bottom, BottomNavigationLayout.scrollContentClearance, for: .scrollContent)
-            .navigationTitle("予定")
+            .navigationTitle("カレンダー")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
