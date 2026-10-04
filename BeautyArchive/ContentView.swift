@@ -145,7 +145,7 @@ struct ContentView: View {
             }
 
         }
-        .tint(Color(uiColor: .label))
+        .tint(.primary)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             BottomNavigationBar(selectedTab: $selectedTab, canCopyVisit: !visits.isEmpty) {
                 addDestination = $0

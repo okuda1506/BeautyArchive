@@ -2,8 +2,13 @@ import SwiftUI
 import UIKit
 
 extension View {
-    func guardUnsavedDraft(_ snapshot: FormDraftSnapshot, observeDismissAttempts: Bool = true, onDiscard: @escaping () -> Void = { }) -> some View {
-        modifier(UnsavedDraftModifier(snapshot: snapshot, observeDismissAttempts: observeDismissAttempts, onDiscard: onDiscard))
+    func guardUnsavedDraft(
+        _ snapshot: FormDraftSnapshot, observeDismissAttempts: Bool = true,
+        onDiscard: @escaping () -> Void = { }
+    ) -> some View {
+        modifier(UnsavedDraftModifier(
+            snapshot: snapshot, observeDismissAttempts: observeDismissAttempts, onDiscard: onDiscard
+        ))
     }
 
     func formKeyboard<Field: Hashable>(

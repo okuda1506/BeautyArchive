@@ -154,6 +154,7 @@ struct HairReferenceForm: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var allPhotos: [ReferencePhoto]
     let reference: HairStyleReference?
+    private let embedsNavigation: Bool
     @State private var title: String
     @State private var memo: String
     @State private var sourceURL: String
@@ -165,8 +166,9 @@ struct HairReferenceForm: View {
     private enum Field: Hashable { case title, memo, sourceURL }
 
 
-    init(reference: HairStyleReference? = nil) {
+    init(reference: HairStyleReference? = nil, embedsNavigation: Bool = true) {
         self.reference = reference
+        self.embedsNavigation = embedsNavigation
         _title = State(initialValue: reference?.title ?? "")
         _memo = State(initialValue: reference?.memo ?? "")
         _sourceURL = State(initialValue: reference?.sourceURL ?? "")
@@ -186,56 +188,62 @@ struct HairReferenceForm: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                FormValidationHint(message: validationMessage)
-                Section("タイトル（必須）") {
-                    TextField("例：次回のショートスタイル", text: $title)
-                        .formField($focusedField, equals: .title)
-                }
-                Section("参考写真") {
-                    PhotoEditor(
-                        existing: existingPhotos.map { StoredPhoto(id: $0.id, data: $0.imageData) },
-                        newPhotos: $newPhotos,
-                        removedPhotoIDs: $removedPhotoIDs
-                    )
-                }
-                Section("オーダーメモ（任意）") {
-                    TextField("前髪・サイド・カラーなど", text: $memo, axis: .vertical)
-                        .formField($focusedField, equals: .memo)
-                        .lineLimit(3...8)
-                }
-                Section("参考元（任意）") {
-                    TextField("https://", text: $sourceURL)
-                        .formField($focusedField, equals: .sourceURL, last: true)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    if !sourceURL.isEmpty && validSourceURL(sourceURL) == nil {
-                        Text("https:// または http:// から始まるURLを入力してください。")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
+        if embedsNavigation {
+            NavigationStack { editor }
+        } else {
+            editor
+                .navigationBarBackButtonHidden()
+        }
+    }
+
+    private var editor: some View {
+        Form {
+            FormValidationHint(message: validationMessage)
+            Section("タイトル（必須）") {
+                TextField("例：次回のショートスタイル", text: $title)
+                    .formField($focusedField, equals: .title)
+            }
+            Section("参考写真") {
+                PhotoEditor(
+                    existing: existingPhotos.map { StoredPhoto(id: $0.id, data: $0.imageData) },
+                    newPhotos: $newPhotos,
+                    removedPhotoIDs: $removedPhotoIDs
+                )
+            }
+            Section("オーダーメモ（任意）") {
+                TextField("前髪・サイド・カラーなど", text: $memo, axis: .vertical)
+                    .formField($focusedField, equals: .memo)
+                    .lineLimit(3...8)
+            }
+            Section("参考元（任意）") {
+                TextField("https://", text: $sourceURL)
+                    .formField($focusedField, equals: .sourceURL, last: true)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                if !sourceURL.isEmpty && validSourceURL(sourceURL) == nil {
+                    Text("https:// または http:// から始まるURLを入力してください。")
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             }
-            .navigationTitle(reference == nil ? "参考スタイルを追加" : "参考スタイルを編集")
-            .navigationBarTitleDisplayMode(.inline)
-            // Let SwiftUI own the sheet delegate when it presents the system photo library.
-            .guardUnsavedDraft(draftSnapshot, observeDismissAttempts: false)
-            .formKeyboard($focusedField, fields: [.title, .memo, .sourceURL])
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }.disabled(!isValid)
-                }
+        }
+        .navigationTitle(reference == nil ? "参考スタイルを追加" : "参考スタイルを編集")
+        .navigationBarTitleDisplayMode(.inline)
+        .guardUnsavedDraft(draftSnapshot, observeDismissAttempts: embedsNavigation)
+        .formKeyboard($focusedField, fields: [.title, .memo, .sourceURL])
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("保存") { save() }.disabled(!isValid)
             }
-            .alert("保存できませんでした", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("閉じる", role: .cancel) { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+        }
+        .alert("保存できませんでした", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("閉じる", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
         }
     }
 

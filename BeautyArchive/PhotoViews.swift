@@ -18,7 +18,6 @@ struct PhotoEditor: View {
     @Binding var newPhotos: [PhotoDraft]
     @Binding var removedPhotoIDs: Set<UUID>
     @State private var showingPicker = false
-    @State private var pendingResults: [PHPickerResult] = []
     @State private var isLoading = false
     @State private var loadError = false
 
@@ -66,19 +65,11 @@ struct PhotoEditor: View {
                 .foregroundStyle(.secondary)
         }
         .buttonStyle(.borderless)
-        .fullScreenCover(isPresented: $showingPicker, onDismiss: {
-            let results = pendingResults
-            pendingResults = []
-            guard !results.isEmpty else { return }
-            // Wait for the picker to disappear before updating the form's rows.
-            Task { await importPhotos(results) }
-        }) {
-            SystemPhotoPicker(selectionLimit: remainingCount) { results in
-                pendingResults = results
-                showingPicker = false
+        .background {
+            SystemPhotoPickerPresenter(isPresented: $showingPicker, selectionLimit: remainingCount) { results in
+                guard !results.isEmpty else { return }
+                Task { await importPhotos(results) }
             }
-            .tint(Color(uiColor: .systemBlue))
-            .ignoresSafeArea()
         }
         .alert("写真を読み込めませんでした", isPresented: $loadError) {
             Button("閉じる", role: .cancel) { }
@@ -140,37 +131,77 @@ struct PhotoEditor: View {
     }
 }
 
-/// Keep the system library controller separate from the SwiftUI Form scroll hierarchy.
-private struct SystemPhotoPicker: UIViewControllerRepresentable {
+/// Present directly from UIKit so the library is not embedded in another SwiftUI
+/// hosting controller while the reference form is already inside stacked sheets.
+private struct SystemPhotoPickerPresenter: UIViewControllerRepresentable {
+    @Binding var isPresented: Bool
     let selectionLimit: Int
     let onFinish: ([PHPickerResult]) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
+    func makeUIViewController(context: Context) -> PresenterController { PresenterController() }
 
-    func makeUIViewController(context: Context) -> PHPickerViewController {
-        var configuration = PHPickerConfiguration()
-        configuration.filter = .images
-        configuration.selectionLimit = max(1, selectionLimit)
-        configuration.selection = .ordered
-        configuration.preferredAssetRepresentationMode = .compatible
-        let picker = PHPickerViewController(configuration: configuration)
-        picker.delegate = context.coordinator
-        picker.view.tintColor = .systemBlue
-        return picker
+    func updateUIViewController(_ controller: PresenterController, context: Context) {
+        controller.selectionLimit = selectionLimit
+        controller.shouldPresent = isPresented
+        controller.onFinish = { results in
+            isPresented = false
+            onFinish(results)
+        }
+        // Present outside SwiftUI's view-update transaction, once the anchor is attached.
+        DispatchQueue.main.async { [weak controller] in controller?.presentIfNeeded() }
     }
 
-    func updateUIViewController(_ picker: PHPickerViewController, context: Context) { }
+    static func dismantleUIViewController(_ controller: PresenterController, coordinator: ()) {
+        controller.shouldPresent = false
+        controller.onFinish = nil
+        controller.activePicker?.dismiss(animated: false)
+    }
 
-    final class Coordinator: NSObject, PHPickerViewControllerDelegate {
-        private let onFinish: ([PHPickerResult]) -> Void
-        private var finished = false
+    final class PresenterController: UIViewController, PHPickerViewControllerDelegate {
+        var shouldPresent = false
+        var selectionLimit = 12
+        var onFinish: (([PHPickerResult]) -> Void)?
+        private(set) var activePicker: PHPickerViewController?
+        private var finishing = false
 
-        init(onFinish: @escaping ([PHPickerResult]) -> Void) { self.onFinish = onFinish }
+        override func loadView() {
+            view = UIView()
+            view.isUserInteractionEnabled = false
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            presentIfNeeded()
+        }
+
+        func presentIfNeeded() {
+            guard shouldPresent, activePicker == nil, !finishing,
+                  viewIfLoaded?.window != nil else { return }
+            var configuration = PHPickerConfiguration()
+            configuration.filter = .images
+            configuration.selectionLimit = max(1, selectionLimit)
+            configuration.selection = .ordered
+            configuration.preferredAssetRepresentationMode = .compatible
+            let picker = PHPickerViewController(configuration: configuration)
+            picker.delegate = self
+            picker.modalPresentationStyle = .fullScreen
+            // Avoid interactive dismissal; the library's Cancel action owns dismissal.
+            picker.isModalInPresentation = true
+            activePicker = picker
+            present(picker, animated: true)
+        }
 
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-            guard !finished else { return }
-            finished = true
-            onFinish(results)
+            guard picker === activePicker, !finishing else { return }
+            finishing = true
+            shouldPresent = false
+            picker.dismiss(animated: true) { [weak self] in
+                guard let self else { return }
+                self.activePicker = nil
+                self.finishing = false
+                // Change the form only after the UIKit transition has finished.
+                self.onFinish?(results)
+            }
         }
     }
 }
