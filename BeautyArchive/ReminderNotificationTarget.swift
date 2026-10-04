@@ -38,10 +38,14 @@ nonisolated struct ReminderNotificationResponse: Sendable {
 
 @MainActor
 struct ReminderNotificationTarget {
-    nonisolated enum Kind: String {
+    nonisolated enum Kind: String, CaseIterable {
         case product = "beautyarchive.product-replacement"
         case salon = "beautyarchive.salon-booking"
 
+        case salonAppointment = "beautyarchive.salon-appointment"
+        case purchasePlan = "beautyarchive.purchase-plan"
+
+        var supportsSnooze: Bool { self == .product || self == .salon }
         var identifierPrefix: String { rawValue + "." }
     }
 
@@ -73,7 +77,7 @@ struct ReminderNotificationTarget {
         notificationTimeMinutes: Int = ReminderPreferences.defaultNotificationTimeMinutes
     ) -> LocalNotificationPlan? {
         let fireDate: Date
-        if let snooze = snoozes.record(for: identifier), snooze.revision == revision {
+        if kind.supportsSnooze, let snooze = snoozes.record(for: identifier), snooze.revision == revision {
             // Retain an expired snooze until this target changes. Changing lead time must
             // not resurrect the original notification after the postponed one has fired.
             guard snooze.fireDate > now,

@@ -37,6 +37,7 @@ struct ContentView: View {
     @Query private var treatments: [SalonTreatment]
     @Query private var photos: [SalonPhoto]
     @Query private var appointments: [BeautyAppointment]
+    @Query private var purchasePlans: [ProductPurchasePlan]
     @Query private var appointmentTreatments: [AppointmentTreatment]
     @Query private var salonReminderAdjustments: [SalonReminderAdjustment]
     @Query private var products: [BeautyProduct]
@@ -81,7 +82,10 @@ struct ContentView: View {
             "\($0.id.uuidString):\($0.visitID.uuidString):\($0.name):\($0.cycleDays)"
         }.sorted().joined(separator: "|")
         let appointmentChanges = appointments.map {
-            "\($0.id.uuidString):\($0.startAt.timeIntervalSince1970):\($0.statusRaw):\($0.completedVisitID?.uuidString ?? "")"
+            "\($0.id.uuidString):\($0.startAt.timeIntervalSince1970):\($0.title):\($0.statusRaw):\($0.completedVisitID?.uuidString ?? "")"
+        }.sorted().joined(separator: "|")
+        let purchaseChanges = purchasePlans.map {
+            "\($0.id.uuidString):\($0.plannedAt.timeIntervalSince1970):\($0.productName):\($0.statusRaw)"
         }.sorted().joined(separator: "|")
         let appointmentTreatmentChanges = appointmentTreatments.map {
             "\($0.id.uuidString):\($0.appointmentID.uuidString):\($0.name)"
@@ -89,7 +93,7 @@ struct ContentView: View {
         let adjustmentChanges = salonReminderAdjustments.map {
             "\($0.id.uuidString):\($0.updatedAt.timeIntervalSince1970):\($0.baseDueDate.timeIntervalSince1970):\($0.overrideDueDate?.timeIntervalSince1970 ?? 0):\($0.snoozedUntil?.timeIntervalSince1970 ?? 0)"
         }.sorted().joined(separator: "|")
-        return "\(remindersEnabled):\(reminderTiming.leadChoice):\(reminderTiming.customLeadDays):\(reminderTiming.notificationTimeMinutes):\(unitChanges):\(productChanges):\(visitChanges):\(treatmentChanges):\(appointmentChanges):\(appointmentTreatmentChanges):\(adjustmentChanges)"
+        return "\(remindersEnabled):\(reminderTiming.leadChoice):\(reminderTiming.customLeadDays):\(reminderTiming.notificationTimeMinutes):\(unitChanges):\(productChanges):\(visitChanges):\(treatmentChanges):\(appointmentChanges):\(purchaseChanges):\(appointmentTreatmentChanges):\(adjustmentChanges)"
     }
 
     var body: some View {

@@ -56,7 +56,7 @@ struct SettingsView: View {
                     ))
                     .disabled(isLoadingAuthorization)
 
-                    Picker("通知タイミング", selection: Binding(
+                    Picker("目安の事前通知", selection: Binding(
                         get: { reminderTiming.leadChoice },
                         set: { reminderTiming.setLeadChoice($0) }
                     )) {
@@ -79,10 +79,10 @@ struct SettingsView: View {
                     } label: {
                         LabeledContent("通知時刻", value: ReminderTimePresentation.label(for: reminderTiming.notificationTimeMinutes))
                     }
-                    Text("通知は選んだ日の設定時刻に届きます。通知から延期した場合も同じ時刻に届きます。")
+                    Text("美容院・購入予定は前日の設定時刻に通知します。予約・買い替え目安は選んだ事前日数と設定時刻で通知します。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("通知の「明日また通知」「1週間後に通知」で再通知を延期できます。Apple Watchに転送された通知からも操作できます。延期はこのiPhoneの通知だけに反映され、目安日は変わりません。")
+                    Text("目安通知の「明日また通知」「1週間後に通知」で再通知を延期できます。Apple Watchに転送された通知からも操作できます。延期はこのiPhoneの通知だけに反映され、目安日は変わりません。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text("iCloudを利用できる場合、通知タイミングと時刻は同じApple Accountの端末へ引き継がれます。反映には時間がかかる場合があります。通知の許可とオン・オフは端末ごとです。")
@@ -101,7 +101,7 @@ struct SettingsView: View {
                             }
                             .font(.subheadline)
                         } else if !isCheckingReminders {
-                            Text("通知予定はありません。未来の予約目安・買い替え目安が対象です。商品ごとの通知設定も確認してください。")
+                            Text("通知予定はありません。未来の予約目安・買い替え目安と美容院・購入予定が対象です。商品ごとの通知設定も確認してください。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -330,7 +330,7 @@ struct SettingsView: View {
         reminderStatusError = await ReminderNotificationCoordinator.shared.reconcile()
         let requests = await UNUserNotificationCenter.current().pendingNotificationRequests()
         let reminderDates = requests.compactMap { request -> (String, Date)? in
-            guard [ReminderNotificationTarget.Kind.product, .salon].contains(where: {
+            guard ReminderNotificationTarget.Kind.allCases.contains(where: {
                 request.identifier.hasPrefix($0.identifierPrefix)
             }), let trigger = request.trigger as? UNCalendarNotificationTrigger,
                   let date = trigger.nextTriggerDate() else { return nil }

@@ -103,7 +103,7 @@ enum LocalNotificationReconciler {
     }
 
     private static func isReminderIdentifier(_ identifier: String) -> Bool {
-        [ReminderNotificationTarget.Kind.product, .salon].contains {
+        ReminderNotificationTarget.Kind.allCases.contains {
             identifier.hasPrefix($0.identifierPrefix)
         }
     }

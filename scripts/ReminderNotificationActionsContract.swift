@@ -219,8 +219,41 @@ struct ReminderNotificationActionsContract {
         expect(unit.openedAt == date(1) && unit.manualUsageDays == 20 && visit.date == date(1),
                "Notification snoozes must leave usage history and salon timing unchanged")
 
+        let appointment = BeautyAppointment(title: "カット", startAt: date(31, hour: 14), endAt: date(31, hour: 15))
+        let purchase = ProductPurchasePlan(productName: "香水", category: .fragrance, plannedAt: date(31))
+        var planTargets = AppointmentNotificationScheduler.targets(appointments: [appointment], purchasePlans: [purchase], now: now, calendar: calendar)
+        expect(planTargets.count == 2, "Both registered plan types must notify")
+        let plans = planTargets.compactMap { $0.plan(snoozes: store, leadDays: 7, now: now, calendar: calendar, notificationTimeMinutes: 20 * 60 + 30) }
+        expect(plans.count == 2 && plans.allSatisfy { $0.fireDate == calendar.date(bySettingHour: 20, minute: 30, second: 0, of: date(30)) }, "Plan reminders must cross months and ignore maintenance lead time")
+        expect(plans.first?.body == "カットは明日14:00です。", "Salon notification must include the actual start time")
+        expect(planTargets.allSatisfy { !$0.kind.supportsSnooze }, "Plan notifications must not offer postponement")
+        let planScheduler = MemoryScheduler()
+        let planCoordinator = ReminderNotificationCoordinator(defaults: defaults, scheduler: planScheduler, targetsProvider: { planTargets })
+        _ = await planCoordinator.reconcile(now: now, calendar: calendar)
+        expect(planScheduler.pending.count == 2, "Both plans must enter the scheduling queue")
+        await planCoordinator.handle(response(planTargets[0]), now: now, calendar: calendar)
+        expect(planScheduler.added == 0, "Even a forged snooze action must not postpone a plan")
+        let oldIdentifier = planTargets[0].identifier
+        appointment.startAt = date(32, hour: 16)
+        appointment.title = "カラー"
+        planTargets = AppointmentNotificationScheduler.targets(appointments: [appointment], purchasePlans: [purchase], now: now, calendar: calendar)
+        expect(planTargets[0].identifier == oldIdentifier && planTargets[0].body == "カラーは明日16:00です。", "Editing a plan must replace its notification without duplicating identifiers")
+        _ = await planCoordinator.reconcile(now: now, calendar: calendar)
+        expect(planScheduler.pending.count == 2 && planScheduler.pending[oldIdentifier]?.body == "カラーは明日16:00です。", "Reconciliation must replace an edited plan")
+        expect(planTargets[1].plan(snoozes: store, leadDays: 0, now: date(30, hour: 21), calendar: calendar, notificationTimeMinutes: 20 * 60 + 30) == nil, "Past notification times must not catch up")
+        appointment.statusRaw = "cancelled"
+        purchase.statusRaw = PurchasePlanStatus.purchased.rawValue
+        expect(AppointmentNotificationScheduler.targets(appointments: [appointment], purchasePlans: [purchase], now: now, calendar: calendar).isEmpty, "Cancelled salon and purchased plans must remove reminders")
+        planTargets = AppointmentNotificationScheduler.targets(appointments: [appointment], purchasePlans: [purchase], now: now, calendar: calendar)
+        _ = await planCoordinator.reconcile(now: now, calendar: calendar)
+        expect(planScheduler.pending.isEmpty, "Reconciliation must remove cancelled or purchased plans")
+        appointment.statusRaw = "booked"
+        appointment.completedVisitID = UUID()
+        purchase.statusRaw = PurchasePlanStatus.cancelled.rawValue
+        expect(AppointmentNotificationScheduler.targets(appointments: [appointment], purchasePlans: [purchase], now: now, calendar: calendar).isEmpty, "Completed salon and cancelled purchases must remove reminders")
+
         let schema = Schema([BeautyProduct.self, ProductUnit.self, SalonVisit.self, SalonTreatment.self,
-                             BeautyAppointment.self, AppointmentTreatment.self, SalonReminderAdjustment.self])
+                             BeautyAppointment.self, AppointmentTreatment.self, SalonReminderAdjustment.self, ProductPurchasePlan.self])
         let container = try ModelContainer(for: schema,
             configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none))
         let context = ModelContext(container)
