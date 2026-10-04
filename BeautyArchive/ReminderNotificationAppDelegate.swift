@@ -22,6 +22,11 @@ final class ReminderNotificationAppDelegate: NSObject, UIApplicationDelegate, UN
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                           willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                            didReceive response: UNNotificationResponse) async {
         let request = response.notification.request
         if ReminderNotificationAction(rawValue: response.actionIdentifier) != nil {

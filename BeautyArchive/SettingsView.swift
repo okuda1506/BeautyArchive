@@ -14,6 +14,11 @@ struct SettingsView: View {
     @AppStorage(ReminderPreferences.enabledKey) private var remindersEnabled = false
     @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @State private var isLoadingAuthorization = true
+    @State private var pendingReminderCount = 0
+    @State private var nextReminderDate: Date?
+    @State private var nextReminderTitle: String?
+    @State private var isCheckingReminders = false
+    @State private var reminderStatusError: String?
     @State private var iCloudStatus: CKAccountStatus?
     @State private var errorMessage: String?
     @State private var isExporting = false
@@ -29,6 +34,10 @@ struct SettingsView: View {
         case .authorized, .provisional, .ephemeral: true
         default: false
         }
+    }
+
+    private var reminderStatusKey: String {
+        "\(remindersEnabled):\(reminderTiming.leadChoice):\(reminderTiming.customLeadDays):\(reminderTiming.notificationTimeMinutes)"
     }
 
     var body: some View {
@@ -82,6 +91,34 @@ struct SettingsView: View {
                     Text(authorizationDescription)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    if remindersEnabled && isAuthorized {
+                        LabeledContent("予約済みの通知", value: "\(pendingReminderCount)件")
+                        if let nextReminderDate, let nextReminderTitle {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("次の通知：\(nextReminderTitle)")
+                                Text(nextReminderDate.japaneseFormatted(date: .abbreviated, time: .shortened))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.subheadline)
+                        } else if !isCheckingReminders {
+                            Text("通知予定はありません。未来の予約目安・買い替え目安が対象です。商品ごとの通知設定も確認してください。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let reminderStatusError {
+                            Text("通知の予約を確認できませんでした。\(reminderStatusError)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Button("通知予定を再確認") {
+                            Task { await refreshReminderStatus() }
+                        }
+                        .disabled(isCheckingReminders)
+                    } else {
+                        Text("iPhone側の許可に加えて、この画面の「通知を受け取る」をオンにしてください。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     if authorizationStatus == .denied {
                         Button("端末の通知設定を開く") {
                             guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
@@ -154,13 +191,17 @@ struct SettingsView: View {
                     }
                 }
             }
-            .task { await refreshAuthorization() }
+            .task(id: reminderStatusKey) {
+                await refreshAuthorization()
+                await refreshReminderStatus()
+            }
             .task { await refreshICloudStatus() }
             .task { await refreshGoogleAccount() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                     Task {
                         await refreshAuthorization()
+                        await refreshReminderStatus()
                         await refreshICloudStatus()
                         await refreshGoogleAccount()
                     }
@@ -279,6 +320,25 @@ struct SettingsView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func refreshReminderStatus() async {
+        guard !isCheckingReminders else { return }
+        isCheckingReminders = true
+        defer { isCheckingReminders = false }
+        reminderStatusError = await ReminderNotificationCoordinator.shared.reconcile()
+        let requests = await UNUserNotificationCenter.current().pendingNotificationRequests()
+        let reminderDates = requests.compactMap { request -> (String, Date)? in
+            guard [ReminderNotificationTarget.Kind.product, .salon].contains(where: {
+                request.identifier.hasPrefix($0.identifierPrefix)
+            }), let trigger = request.trigger as? UNCalendarNotificationTrigger,
+                  let date = trigger.nextTriggerDate() else { return nil }
+            return (request.content.title, date)
+        }.sorted { $0.1 < $1.1 }
+        pendingReminderCount = reminderDates.count
+        nextReminderTitle = reminderDates.first?.0
+        nextReminderDate = reminderDates.first?.1
     }
 
     @MainActor
