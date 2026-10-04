@@ -17,7 +17,8 @@ struct PhotoEditor: View {
     let existing: [StoredPhoto]
     @Binding var newPhotos: [PhotoDraft]
     @Binding var removedPhotoIDs: Set<UUID>
-    @State private var selectedItems: [PhotosPickerItem] = []
+    @State private var showingPicker = false
+    @State private var pendingResults: [PHPickerResult] = []
     @State private var isLoading = false
     @State private var loadError = false
 
@@ -32,42 +33,52 @@ struct PhotoEditor: View {
     }
 
     var body: some View {
-        if !visibleExisting.isEmpty || !newPhotos.isEmpty {
-            ScrollView(.horizontal) {
-                HStack(spacing: 12) {
-                    ForEach(visibleExisting) { photo in
-                        removableThumbnail(data: photo.data) {
-                            removedPhotoIDs.insert(photo.id)
+        VStack(alignment: .leading, spacing: 12) {
+            if !visibleExisting.isEmpty || !newPhotos.isEmpty {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 12) {
+                        ForEach(visibleExisting) { photo in
+                            removableThumbnail(data: photo.data) {
+                                removedPhotoIDs.insert(photo.id)
+                            }
+                        }
+                        ForEach(newPhotos) { photo in
+                            removableThumbnail(data: photo.data) {
+                                newPhotos.removeAll { $0.id == photo.id }
+                            }
                         }
                     }
-                    ForEach(newPhotos) { photo in
-                        removableThumbnail(data: photo.data) {
-                            newPhotos.removeAll { $0.id == photo.id }
-                        }
-                    }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
             }
-        }
 
-        if remainingCount > 0 {
-            PhotosPicker(
-                selection: $selectedItems,
-                maxSelectionCount: remainingCount,
-                matching: .images
-            ) {
-                Label("写真を追加", systemImage: "photo.on.rectangle.angled")
+            if remainingCount > 0 {
+                Button {
+                    showingPicker = true
+                } label: {
+                    Label("写真を追加", systemImage: "photo.on.rectangle.angled")
+                }
+                .disabled(isLoading)
             }
-            .disabled(isLoading)
-            .onChange(of: selectedItems) { _, items in
-                guard !items.isEmpty else { return }
-                Task { await importPhotos(items) }
-            }
+            if isLoading { ProgressView("写真を読み込み中") }
+            Text("最大12枚。保存時に表示用サイズへ縮小します。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        if isLoading { ProgressView("写真を読み込み中") }
-        Text("最大12枚。保存時に表示用サイズへ縮小します。")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+        .buttonStyle(.borderless)
+        .fullScreenCover(isPresented: $showingPicker, onDismiss: {
+            let results = pendingResults
+            pendingResults = []
+            guard !results.isEmpty else { return }
+            // Wait for the picker to disappear before updating the form's rows.
+            Task { await importPhotos(results) }
+        }) {
+            SystemPhotoPicker(selectionLimit: remainingCount) { results in
+                pendingResults = results
+                showingPicker = false
+            }
+            .ignoresSafeArea()
+        }
         .alert("写真を読み込めませんでした", isPresented: $loadError) {
             Button("閉じる", role: .cancel) { }
         } message: {
@@ -91,17 +102,16 @@ struct PhotoEditor: View {
     }
 
     @MainActor
-    private func importPhotos(_ items: [PhotosPickerItem]) async {
+    private func importPhotos(_ results: [PHPickerResult]) async {
         guard !isLoading else { return }
         isLoading = true
         defer {
-            selectedItems = []
             isLoading = false
         }
         var failed = false
-        for item in items.prefix(remainingCount) {
+        for result in results.prefix(remainingCount) {
             do {
-                guard let original = try await item.loadTransferable(type: Data.self),
+                guard let original = try await photoData(from: result.itemProvider),
                       let optimized = await Task.detached(priority: .userInitiated, operation: {
                           PhotoImageProcessor.optimizedJPEG(original)
                       }).value else {
@@ -114,6 +124,52 @@ struct PhotoEditor: View {
             }
         }
         loadError = failed
+    }
+
+    private func photoData(from provider: NSItemProvider) async throws -> Data? {
+        guard let type = provider.registeredTypeIdentifiers.first(where: {
+            UTType($0)?.conforms(to: .image) == true
+        }) else { return nil }
+        return try await withCheckedThrowingContinuation { continuation in
+            provider.loadDataRepresentation(forTypeIdentifier: type) { data, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: data) }
+            }
+        }
+    }
+}
+
+/// Keep the system library controller separate from the SwiftUI Form scroll hierarchy.
+private struct SystemPhotoPicker: UIViewControllerRepresentable {
+    let selectionLimit: Int
+    let onFinish: ([PHPickerResult]) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
+
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .images
+        configuration.selectionLimit = max(1, selectionLimit)
+        configuration.selection = .ordered
+        configuration.preferredAssetRepresentationMode = .compatible
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ picker: PHPickerViewController, context: Context) { }
+
+    final class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        private let onFinish: ([PHPickerResult]) -> Void
+        private var finished = false
+
+        init(onFinish: @escaping ([PHPickerResult]) -> Void) { self.onFinish = onFinish }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            guard !finished else { return }
+            finished = true
+            onFinish(results)
+        }
     }
 }
 

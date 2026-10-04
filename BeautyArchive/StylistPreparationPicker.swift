@@ -16,11 +16,6 @@ struct StylistPreparationPicker: View {
                         Label("参考スタイルはまだありません", systemImage: "photo.stack")
                     } description: {
                         Text("写真とオーダーメモを保存すると、ここから美容師に見せられます。")
-                    } actions: {
-                        Button("参考スタイルを追加", systemImage: "plus") {
-                            showingAdd = true
-                        }
-                        .buttonStyle(.borderedProminent)
                     }
                 } else {
                     List(references) { reference in
@@ -56,6 +51,22 @@ struct StylistPreparationPicker: View {
                             .padding(.vertical, 4)
                         }
                     }
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if references.isEmpty {
+                    Button {
+                        showingAdd = true
+                    } label: {
+                        Label("参考スタイルを追加", systemImage: "plus")
+                            .font(.headline)
+                            .foregroundStyle(Color(uiColor: .systemBackground))
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(Color(uiColor: .label))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
                 }
             }
             .navigationTitle("オーダーを準備")
