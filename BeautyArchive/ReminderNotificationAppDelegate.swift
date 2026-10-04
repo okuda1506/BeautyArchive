@@ -13,8 +13,8 @@ final class ReminderNotificationAppDelegate: NSObject, UIApplicationDelegate, UN
         let actions = [ReminderNotificationAction.tomorrow, .nextWeek].map {
             UNNotificationAction(identifier: $0.rawValue, title: $0.title, options: [])
         }
-        let categories = [ReminderNotificationTarget.Kind.product, .salon].map {
-            UNNotificationCategory(identifier: $0.rawValue, actions: actions,
+        let categories = ReminderNotificationTarget.Kind.allCases.map {
+            UNNotificationCategory(identifier: $0.rawValue, actions: $0.supportsSnooze ? actions : [],
                                    intentIdentifiers: [], options: [])
         }
         center.setNotificationCategories(Set(categories))

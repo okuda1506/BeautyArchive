@@ -10,6 +10,7 @@ swiftc -swift-version 5 \
   "$project_dir/BeautyArchive/ReminderPreferences.swift" \
   "$project_dir/BeautyArchive/BeautyProduct.swift" \
   "$project_dir/BeautyArchive/ProductUnit.swift" \
+  "$project_dir/BeautyArchive/ProductPurchasePlan.swift" \
   "$project_dir/BeautyArchive/ReplacementEstimate.swift" \
   "$project_dir/BeautyArchive/SalonRecord.swift" \
   "$project_dir/BeautyArchive/SalonPhoto.swift" \

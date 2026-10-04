@@ -132,6 +132,10 @@ final class ReminderNotificationCoordinator {
             appointmentTreatments: context.fetch(FetchDescriptor<AppointmentTreatment>()),
             reminderAdjustments: context.fetch(FetchDescriptor<SalonReminderAdjustment>()),
             now: now, calendar: calendar
+        ) + AppointmentNotificationScheduler.targets(
+            appointments: context.fetch(FetchDescriptor<BeautyAppointment>()),
+            purchasePlans: context.fetch(FetchDescriptor<ProductPurchasePlan>()),
+            now: now, calendar: calendar
         )
     }
 
@@ -163,6 +167,7 @@ final class ReminderNotificationCoordinator {
         let targets = try loadTargets(now: now, calendar: calendar)
         guard defaults.bool(forKey: ReminderPreferences.enabledKey),
               let target = targets.first(where: { $0.matches(response) }),
+              target.kind.supportsSnooze,
               await scheduler.isAuthorized()
         else {
             if let error = await performReconciliation(now: now, calendar: calendar) {
