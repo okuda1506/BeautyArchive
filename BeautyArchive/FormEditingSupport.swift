@@ -2,8 +2,8 @@ import SwiftUI
 import UIKit
 
 extension View {
-    func guardUnsavedDraft(_ snapshot: FormDraftSnapshot, onDiscard: @escaping () -> Void = { }) -> some View {
-        modifier(UnsavedDraftModifier(snapshot: snapshot, onDiscard: onDiscard))
+    func guardUnsavedDraft(_ snapshot: FormDraftSnapshot, observeDismissAttempts: Bool = true, onDiscard: @escaping () -> Void = { }) -> some View {
+        modifier(UnsavedDraftModifier(snapshot: snapshot, observeDismissAttempts: observeDismissAttempts, onDiscard: onDiscard))
     }
 
     func formKeyboard<Field: Hashable>(
@@ -62,6 +62,7 @@ private struct FormKeyboardModifier<Field: Hashable>: ViewModifier {
 private struct UnsavedDraftModifier: ViewModifier {
     @Environment(\.dismiss) private var dismiss
     let snapshot: FormDraftSnapshot
+    let observeDismissAttempts: Bool
     let onDiscard: () -> Void
     @State private var draftState = FormDraftState()
     @State private var showingDiscard = false
@@ -72,9 +73,13 @@ private struct UnsavedDraftModifier: ViewModifier {
         content
             .onAppear { draftState.captureBaseline(snapshot) }
             .interactiveDismissDisabled(hasChanges)
-            .background(SheetDismissObserver(
-                hasChanges: hasChanges, onAttempt: { showingDiscard = true }, onDismiss: onDiscard
-            ))
+            .background {
+                if observeDismissAttempts {
+                    SheetDismissObserver(
+                        hasChanges: hasChanges, onAttempt: { showingDiscard = true }, onDismiss: onDiscard
+                    )
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル") {

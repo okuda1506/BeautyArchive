@@ -77,6 +77,7 @@ struct PhotoEditor: View {
                 pendingResults = results
                 showingPicker = false
             }
+            .tint(Color(uiColor: .systemBlue))
             .ignoresSafeArea()
         }
         .alert("写真を読み込めませんでした", isPresented: $loadError) {
@@ -154,6 +155,7 @@ private struct SystemPhotoPicker: UIViewControllerRepresentable {
         configuration.preferredAssetRepresentationMode = .compatible
         let picker = PHPickerViewController(configuration: configuration)
         picker.delegate = context.coordinator
+        picker.view.tintColor = .systemBlue
         return picker
     }
 

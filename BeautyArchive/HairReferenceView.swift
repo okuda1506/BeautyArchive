@@ -220,7 +220,8 @@ struct HairReferenceForm: View {
             }
             .navigationTitle(reference == nil ? "参考スタイルを追加" : "参考スタイルを編集")
             .navigationBarTitleDisplayMode(.inline)
-            .guardUnsavedDraft(draftSnapshot)
+            // Let SwiftUI own the sheet delegate when it presents the system photo library.
+            .guardUnsavedDraft(draftSnapshot, observeDismissAttempts: false)
             .formKeyboard($focusedField, fields: [.title, .memo, .sourceURL])
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
