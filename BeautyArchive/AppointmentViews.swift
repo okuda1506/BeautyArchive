@@ -135,6 +135,7 @@ struct AppointmentListView: View {
                     }
                 }
             }
+            .contentMargins(.bottom, BottomNavigationLayout.scrollContentClearance, for: .scrollContent)
             .navigationTitle("予定")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
