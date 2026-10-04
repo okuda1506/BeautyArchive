@@ -71,10 +71,12 @@ struct StylistPreparationPicker: View {
             }
             .navigationTitle("オーダーを準備")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("閉じる") { dismiss() }
+                if !showingAdd {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("閉じる") { dismiss() }
+                    }
                 }
-                if !references.isEmpty {
+                if !showingAdd && !references.isEmpty {
                     ToolbarItem(placement: .primaryAction) {
                         Button("参考スタイルを追加", systemImage: "plus") {
                             showingAdd = true
@@ -83,7 +85,9 @@ struct StylistPreparationPicker: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingAdd) { HairReferenceForm() }
+            .navigationDestination(isPresented: $showingAdd) {
+                HairReferenceForm(embedsNavigation: false)
+            }
         }
     }
 
