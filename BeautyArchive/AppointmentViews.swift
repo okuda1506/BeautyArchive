@@ -478,13 +478,14 @@ private struct MonthCalendarView: View {
     }
 }
 
-private struct AppointmentDetail: View {
+struct AppointmentDetail: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var googleLinks: [GoogleAppointmentLink]
     let appointment: BeautyAppointment
     let onSave: (Date) -> Void
     @Query private var allTreatments: [AppointmentTreatment]
     @State private var showingEdit = false
+    @State private var showingRecord = false
     @State private var googleAccount: GoogleAccountIdentity?
     @State private var syncErrorMessage: String?
 
@@ -512,6 +513,13 @@ private struct AppointmentDetail: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            if !appointment.isCancelled && !appointment.isCompleted && appointment.startAt <= .now {
+                Section {
+                    Button("来店を記録", systemImage: "square.and.pencil") {
+                        showingRecord = true
+                    }
+                }
+            }
             Section("対象の施術") {
                 ForEach(treatments) { treatment in Text(treatment.name) }
             }
@@ -536,6 +544,7 @@ private struct AppointmentDetail: View {
                 }
             }
         }
+        .contentMargins(.bottom, BottomNavigationLayout.scrollContentClearance, for: .scrollContent)
         .navigationTitle(appointment.title)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -544,6 +553,9 @@ private struct AppointmentDetail: View {
         }
         .sheet(isPresented: $showingEdit) {
             AppointmentForm(appointment: appointment, treatments: treatments, onSave: onSave)
+        }
+        .sheet(isPresented: $showingRecord) {
+            SalonVisitForm(completingAppointment: appointment, appointmentTreatments: treatments)
         }
         .task {
             googleAccount = try? await GoogleCalendarConnection.shared.currentAccount()
