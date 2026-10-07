@@ -201,9 +201,14 @@ struct HairReferenceForm: View {
                     )
                 }
                 Section("オーダーメモ（任意）") {
-                    TextField("前髪・サイド・カラーなど", text: $memo, axis: .vertical)
-                        .formField($focusedField, equals: .memo)
-                        .lineLimit(3...8)
+                    // Keep the multiline editor's layout stable while the sheet opens.
+                    TextEditor(text: $memo)
+                        .focused($focusedField, equals: .memo)
+                        .frame(height: 120)
+                        .accessibilityLabel("オーダーメモ")
+                    Text("前髪・サイド・カラーなど")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 Section("参考元（任意）") {
                     TextField("https://", text: $sourceURL)
